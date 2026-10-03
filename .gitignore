@@ -22,3 +22,6 @@ build/
 
 # Node tooling
 node_modules/
+
+# Machine-specific build settings
+Config/Local.xcconfig

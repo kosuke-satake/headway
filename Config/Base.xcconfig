@@ -1,0 +1,4 @@
+// Shared build settings. Machine-specific values go in Config/Local.xcconfig (not committed), for example:
+//   DEVELOPMENT_TEAM = ABCDE12345
+// so that regenerating the project with XcodeGen never loses the signing team.
+#include? "Local.xcconfig"
