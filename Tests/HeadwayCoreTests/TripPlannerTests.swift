@@ -147,6 +147,9 @@ private func makePlannerFeed() throws -> Schedule {
     #expect(journey.rides.first?.tripID == "r1a")
     #expect(journey.arrival == monday(8, 10))
     #expect(journey.departure < monday(8, 0))
+    // The walk is moved as late as possible: it ends exactly when the bus leaves.
+    #expect(lead.end == monday(8, 0))
+    #expect(journey.departure > monday(7, 56))
   }
 
   @Test func walksFromTheLastStopToAnArbitraryPoint() throws {

@@ -40,6 +40,12 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
     `Components` (route badge, live status, circle button).
   - `App/Support/`: `Formatting.swift` (times, delays, headsigns), `Theme.swift` (map theme, route palettes, colour
     helpers), `LocationController.swift` (permission asked only when the user taps the location button), `Haptics`.
+  - `App/Menu/MenuDrawer.swift`: hamburger button and the left drawer (modes Map / Service info / Plan a trip, plus
+    shortcuts to routes, search and settings). `AppModel.mode` switches the content; the map stays alive underneath.
+  - `App/Info/InfoView.swift`: the service board. `App/Plan/`: `PlanModel` (inputs, results), `PlanView` (inputs, result
+    cards, journey detail and steps), `PlacePicker` (stops, favourites, MapKit place search), and
+    `App/Sheets/JourneySheet.swift` (summary over the map; the journey is drawn by `MapLayers.setJourney`).
+  - Map long-press drops a pin and offers directions to or from it; a stop's sheet has a Directions button.
   - `App/RootView.swift`: map, status pill, controls, focus chip, sheet routing (stop and bus share one sheet
     identity so selecting another does not re-present it).
   - `App/Resources/`: `Localizable.xcstrings` (English keys, Japanese values; add both when adding UI text),
@@ -52,6 +58,12 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
     app by `project.yml`, so run `tools/fetch_basemap.sh` before building. Attribution: (c) OpenStreetMap contributors.
   - `Sources/HeadwayCore/Static/`: `CSV.swift` (byte-level CSV scanner), `Models.swift` (Route, Stop, Trip, StopTime,
     ServiceDate), `Schedule.swift` (in-memory static GTFS from a zip or folder; service calendar; trips in progress).
+  - `Sources/HeadwayCore/Planning/`: `TripPlanner.swift` (round-based connection scan: for each number of buses the
+    earliest arrival, with walking access and footpath transfers, live delays applied to buses that report; a second
+    scan finds the buses after the first journey's), `Journey.swift` (journey, legs, polylines along the route shape).
+  - `Sources/HeadwayCore/ServiceStatus.swift` (per-route delays, cancelled trips, trips without a position),
+    `Geometry.swift` (distances, nearest point on a line, bus-to-route distance), `Arrivals.swift` (stop board, remaining
+    stops of a trip).
   - `Sources/HeadwayCore/Realtime/`: `RealtimeDecoder.swift` (protobuf to plain structs), `RealtimeModels.swift`,
     `RealtimeClient.swift` (async fetch of the three feeds).
   - `Sources/HeadwayCore/Generated/gtfs-realtime.pb.swift`: generated from `proto/gtfs-realtime.proto`; do not edit.
@@ -80,15 +92,16 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Smoke test of the recorder: `python3 tools/record_feeds.py --once --no-static`.
 - Build: `swift build`; test: `swift test`.
 - Analyse a recording: `swift build -c release && .build/release/feedanalysis report data/feeds/<date>`
-  (also `schedule <zip>` and `sample <dir>` / `shape <dir>` to inspect the data).
+  (also `schedule <zip>`, `sample <dir>`, `shape <dir>`, `deviation <dir>` (how far buses stray from route lines) and
+  `plan <dir> <from> <to> [HH:mm | yyyy-MM-ddTHH:mm]` to try the planner on the real timetable).
 - Regenerate protobuf code: `protoc --swift_out=Sources/HeadwayCore/Generated --swift_opt=Visibility=Public -I proto proto/gtfs-realtime.proto`
   (needs `brew install protobuf swift-protobuf`).
 - Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
 - App: `xcodegen generate`, then
   `xcodebuild -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO`.
-- Tests: `swift test` (data layer, 31) and
+- Tests: `swift test` (data layer, 55) and
   `xcodebuild test -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO`
-  (app, 15).
+  (app, 16).
 - Before building the app: `tools/fetch_basemap.sh` and `tools/fetch_timetable.sh` (both outputs are bundled by
   `project.yml` and not committed), then `xcodegen generate`.
 - Icon: `swift tools/make_icon.swift App/Resources/Assets.xcassets/AppIcon.appiconset` (light, dark, tinted).
@@ -104,6 +117,11 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Predictions come from the city's trip-updates feed, which has no delay field and covers only trips with a bus;
   the board therefore shows the timetable for the rest. Whether predictions are biased is unverified (see
   `docs/data-sources.md`).
+- Detour paths are not published by the city (the alerts have text, a link to its detour page, and a period). Buses on
+  routes with an alert were mostly on their normal line in the first recording, so inferring detour paths from live
+  positions is not reliable yet; the app dashes affected routes and rings buses that are off their line.
+- Trip planner: walking is a straight line scaled by 1.3 (no street network offline); places by name need Apple Maps
+  (online); "arrive by" is not implemented; the search looks 4 hours ahead.
 - Bus markers trail the real bus by up to one update interval plus the feed's own latency.
 - Publishing: the data terms contain an indemnification clause (see `docs/data-sources.md`); the App Store needs the
   paid Developer Program; map tiles need the OSM attribution (already in Settings and the map's info button).

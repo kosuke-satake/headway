@@ -53,6 +53,13 @@ From `feedanalysis report` on the first 35 minutes of the recording:
   built; it is not verified. The 24 h report (`docs/feed-analysis-2026-10-03.md`, written automatically) is the
   better basis.
 
+## Alerts
+
+Nine alerts on 2026-10-03, all with effect `DETOUR`, a description, a link to a city detour page and a coarse active
+period (whole days; the text has the real hours). They name routes, not stops, even when the text says a stop is
+closed. There is no geometry. Moving buses were within a few metres of their route line on almost every route, including
+routes with alerts (the detours are limited in time), so a detour path cannot yet be recovered from positions.
+
 ## Open questions
 
 - Do the preliminary numbers above hold over a full day, and do they differ by hour and route?

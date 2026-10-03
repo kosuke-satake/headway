@@ -91,3 +91,16 @@ extension TimeText {
     return formatter.string(from: date)
   }
 }
+
+extension TimeText {
+  /// "28 min" or "1 h 5 min".
+  static func duration(_ seconds: TimeInterval) -> String {
+    let minutes = max(1, Int((seconds / 60).rounded()))
+    if minutes < 60 { return String(localized: "\(minutes) min") }
+    let hours = minutes / 60, rest = minutes % 60
+    return rest == 0 ? String(localized: "\(hours) h") : String(localized: "\(hours) h \(rest) min")
+  }
+
+  /// "230 m" below a kilometre, otherwise "1.4 km" (or the locale's units).
+  static func walking(_ meters: Double) -> String { distance(meters) }
+}

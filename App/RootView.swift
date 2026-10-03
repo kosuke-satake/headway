@@ -12,18 +12,33 @@ struct RootView: View {
     ZStack(alignment: .top) {
       MapContainer(bottomInset: model.sheet?.isDetail == true ? Self.detailHeight : 0)
         .ignoresSafeArea()
-      VStack(spacing: 8) {
-        StatusPill()
-        if let focus = model.focusedRouteID { FocusChip(routeID: focus) }
-        if case .failed(let message) = model.phase { FailureBanner(message: message) }
-      }
-      .padding(.top, 8)
-      .padding(.horizontal, 16)
+        .accessibilityHidden(model.mode != .map)
+      if model.mode == .map {
+        VStack(spacing: 8) {
+          StatusPill()
+          if let focus = model.focusedRouteID { FocusChip(routeID: focus) }
+          if case .failed(let message) = model.phase { FailureBanner(message: message) }
+        }
+        .padding(.top, 8)
+        .padding(.horizontal, 64)
 
-      Controls()
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.top, 54)
-        .padding(.trailing, 12)
+        MenuButton()
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.top, 2)
+          .padding(.leading, 12)
+
+        Controls()
+          .frame(maxWidth: .infinity, alignment: .trailing)
+          .padding(.top, 54)
+          .padding(.trailing, 12)
+      }
+      if model.mode == .info {
+        InfoView().background(Color(.systemGroupedBackground).ignoresSafeArea())
+      }
+      if model.mode == .plan {
+        PlanView().background(Color(.systemGroupedBackground).ignoresSafeArea())
+      }
+      MenuDrawer()
     }
     .sheet(item: $model.sheet) { sheet in
       switch sheet {
@@ -31,6 +46,8 @@ struct RootView: View {
         StopSheet(stopID: id).modifier(DetailSheetStyle(height: Self.detailHeight))
       case .bus(let id):
         BusSheet(vehicleID: id).modifier(DetailSheetStyle(height: Self.detailHeight))
+      case .journey:
+        JourneySheet().modifier(DetailSheetStyle(height: Self.detailHeight))
       case .settings:
         // Half height with the map still usable, so a change (colours, marker size) can be watched on the map.
         SettingsView()
@@ -42,6 +59,18 @@ struct RootView: View {
       case .search:
         SearchSheet().presentationDetents([.medium, .large])
       }
+    }
+    .confirmationDialog(
+      model.droppedPin?.name ?? "", isPresented: Binding(get: { model.droppedPin != nil }, set: { if !$0 { model.droppedPin = nil } }),
+      titleVisibility: .visible
+    ) {
+      Button("Directions to here") {
+        if let pin = model.droppedPin { model.startDirections(to: pin) }
+      }
+      Button("Directions from here") {
+        if let pin = model.droppedPin { model.startDirections(from: pin) }
+      }
+      Button("Cancel", role: .cancel) {}
     }
     .preferredColorScheme(colorScheme)
     .onChange(of: scenePhase) { _, phase in model.setActive(phase == .active) }

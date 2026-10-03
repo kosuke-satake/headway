@@ -36,6 +36,14 @@ struct StopSheet: View {
           .font(.footnote).foregroundStyle(.secondary)
         }
         Spacer(minLength: 8)
+        Button {
+          model.startDirections(to: PlanPoint(name: stop.name, coordinate: Coordinate(latitude: stop.latitude, longitude: stop.longitude), stopID: stop.id))
+        } label: {
+          Image(systemName: "arrow.triangle.turn.up.right.circle.fill").font(.title2).symbolRenderingMode(.hierarchical)
+            .foregroundStyle(Color.accentColor).frame(width: 40, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Directions to here"))
         Button { model.settings.toggleFavorite(stop: stop.id) } label: {
           Image(systemName: model.settings.isFavorite(stop: stop.id) ? "star.fill" : "star")
             .font(.title3).foregroundStyle(model.settings.isFavorite(stop: stop.id) ? Color.orange : .secondary)

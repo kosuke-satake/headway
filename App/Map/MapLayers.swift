@@ -29,6 +29,13 @@ final class MapLayers {
   private let stopNames: MLNSymbolStyleLayer
   private let selectedBusLayer: MLNCircleStyleLayer
   private let offRouteLayer: MLNCircleStyleLayer
+  private let journeySource: MLNShapeSource
+  private let journeyPointSource: MLNShapeSource
+  private var journeyCasing: MLNLineStyleLayer?
+  private var journeyWalk: MLNLineStyleLayer?
+  private var journeyRides: [MLNLineStyleLayer] = []
+  private var journeyPointLayers: [String: MLNCircleStyleLayer] = [:]
+  static let journeyLegSlots = 10
   private var busRings: [String: MLNCircleStyleLayer] = [:]
   private var busDots: [String: MLNCircleStyleLayer] = [:]
   private var busLabels: [String: MLNSymbolStyleLayer] = [:]
@@ -54,8 +61,10 @@ final class MapLayers {
     favoriteSource = MLNShapeSource(identifier: "favorite-stops", features: [], options: nil)
     selectedStopSource = MLNShapeSource(identifier: "selected-stop", features: [], options: nil)
     busSource = MLNShapeSource(identifier: "buses", features: [], options: nil)
+    journeySource = MLNShapeSource(identifier: "journey", features: [], options: nil)
+    journeyPointSource = MLNShapeSource(identifier: "journey-points", features: [], options: nil)
     selectedBusSource = MLNShapeSource(identifier: "selected-bus", features: [], options: nil)
-    for source in [routeSource, stopSource, favoriteSource, selectedStopSource, busSource, selectedBusSource] {
+    for source in [routeSource, stopSource, favoriteSource, selectedStopSource, busSource, selectedBusSource, journeySource, journeyPointSource] {
       style.addSource(source)
     }
 
@@ -82,6 +91,31 @@ final class MapLayers {
     Self.insertBelowLabels(favoriteLayer, in: style)
     selectedStopLayer = MLNCircleStyleLayer(identifier: "selected-stop", source: selectedStopSource)
     Self.insertBelowLabels(selectedStopLayer, in: style)
+
+    // The journey sits above routes and stops but below stop names and buses.
+    let casing = MLNLineStyleLayer(identifier: "journey-casing", source: journeySource)
+    casing.lineCap = NSExpression(forConstantValue: "round")
+    casing.lineJoin = NSExpression(forConstantValue: "round")
+    Self.insertBelowLabels(casing, in: style)
+    journeyCasing = casing
+    let walk = MLNLineStyleLayer(identifier: "journey-walk", source: journeySource)
+    walk.predicate = NSPredicate(format: "walk == %@", NSNumber(value: true))
+    Self.insertBelowLabels(walk, in: style)
+    journeyWalk = walk
+    for slot in 0..<Self.journeyLegSlots {
+      let ride = MLNLineStyleLayer(identifier: "journey-ride-\(slot)", source: journeySource)
+      ride.predicate = NSPredicate(format: "walk == %@ AND leg == %d", NSNumber(value: false), slot)
+      ride.lineCap = NSExpression(forConstantValue: "round")
+      ride.lineJoin = NSExpression(forConstantValue: "round")
+      Self.insertBelowLabels(ride, in: style)
+      journeyRides.append(ride)
+    }
+    for kind in ["start", "transfer", "end"] {
+      let layer = MLNCircleStyleLayer(identifier: "journey-point-\(kind)", source: journeyPointSource)
+      layer.predicate = NSPredicate(format: "kind == %@", kind)
+      Self.insertBelowLabels(layer, in: style)
+      journeyPointLayers[kind] = layer
+    }
 
     stopNames = MLNSymbolStyleLayer(identifier: "stop-names", source: stopSource)
     style.addLayer(stopNames)
@@ -207,6 +241,47 @@ final class MapLayers {
     selectedBusLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.systemBlue)
     selectedBusLayer.circleStrokeWidth = NSExpression(forConstantValue: 3)
     selectedBusLayer.circleRadius = NSExpression(forConstantValue: prefs.markerSize.radius + 6)
+  }
+
+  // MARK: Journey
+
+  func applyJourneyStyle(_ state: MapState) {
+    let theme = MapTheme.make(dark: state.isDark)
+    journeyCasing?.lineColor = NSExpression(forConstantValue: theme.routeCasing)
+    journeyCasing?.lineWidth = Self.ramp([10: 8, 16: 16])
+    journeyWalk?.lineColor = NSExpression(forConstantValue: state.isDark ? UIColor(white: 0.85, alpha: 1) : UIColor(white: 0.3, alpha: 1))
+    journeyWalk?.lineWidth = Self.ramp([10: 3, 16: 5])
+    journeyWalk?.lineDashPattern = NSExpression(forConstantValue: [1.2, 1.4])
+    journeyWalk?.lineCap = NSExpression(forConstantValue: "butt")
+    let colors: [String: UIColor] = ["start": .systemGreen, "transfer": state.isDark ? .white : UIColor(white: 0.2, alpha: 1), "end": .systemRed]
+    for (kind, layer) in journeyPointLayers {
+      layer.circleColor = NSExpression(forConstantValue: theme.stopFill)
+      layer.circleStrokeColor = NSExpression(forConstantValue: colors[kind] ?? .gray)
+      layer.circleStrokeWidth = NSExpression(forConstantValue: 4)
+      layer.circleRadius = Self.ramp([10: 5, 16: 9])
+    }
+  }
+
+  func setJourney(_ state: MapState) {
+    var features: [MLNPolylineFeature] = []
+    for (index, line) in state.journeyLines.enumerated() where line.coordinates.count > 1 {
+      var coordinates = line.coordinates
+      let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+      feature.attributes = ["leg": min(index, Self.journeyLegSlots - 1), "walk": line.isWalk]
+      features.append(feature)
+      if !line.isWalk, index < Self.journeyLegSlots {
+        journeyRides[index].lineColor = NSExpression(forConstantValue: line.color ?? UIColor.systemBlue)
+        journeyRides[index].lineWidth = Self.ramp([10: 4.5, 16: 10])
+      }
+    }
+    journeySource.shape = MLNShapeCollectionFeature(shapes: features)
+    let points = state.journeyPoints.map { entry -> MLNPointFeature in
+      let point = MLNPointFeature()
+      point.coordinate = entry.coordinate
+      point.attributes = ["kind": entry.kind]
+      return point
+    }
+    journeyPointSource.shape = MLNShapeCollectionFeature(shapes: points)
   }
 
   // MARK: Data

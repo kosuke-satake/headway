@@ -47,6 +47,17 @@ struct MapState {
   /// Routes with an alert in force (drawn dashed) and buses away from their usual line (ringed in orange).
   var alertRoutes: Set<String> = []
   var offRouteVehicles: Set<String> = []
+  /// The journey shown on the map: an id to notice changes, its lines, and the points where legs meet.
+  var journeyID: String?
+  var journeyLines: [JourneyLine] = []
+  var journeyPoints: [(coordinate: CLLocationCoordinate2D, kind: String)] = []
+}
+
+/// One line of a journey, ready to draw.
+struct JourneyLine {
+  let coordinates: [CLLocationCoordinate2D]
+  let color: UIColor?  // nil for walking
+  let isWalk: Bool
 }
 
 /// Colours and visibility of one route, derived from the state.
@@ -74,7 +85,7 @@ struct RouteLook {
       fill: line,
       busFill: bus,
       busText: RouteColors.text(on: bus),
-      opacity: anyFocus && !isFocused ? 0.18 : 1,
+      opacity: (anyFocus && !isFocused) || state.journeyID != nil ? 0.2 : 1,
       visible: !prefs.hiddenRoutes.contains(route.id))
   }
 }

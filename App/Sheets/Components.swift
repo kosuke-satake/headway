@@ -11,6 +11,8 @@ struct RouteBadge: View {
     let look = style()
     Text(model.route(routeID)?.shortName ?? routeID)
       .font((compact ? Font.caption : Font.subheadline).weight(.bold))
+      .lineLimit(1)
+      .fixedSize(horizontal: true, vertical: false)
       .foregroundStyle(look.text)
       .padding(.horizontal, compact ? 6 : 9)
       .frame(minWidth: compact ? 24 : 34, minHeight: compact ? 20 : 28)

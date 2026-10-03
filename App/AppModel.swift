@@ -3,10 +3,17 @@ import Foundation
 import HeadwayCore
 import Observation
 
+/// What the app is for at the moment. The map stays alive underneath the other two.
+enum AppMode: String, CaseIterable, Identifiable {
+  case map, info, plan
+  var id: String { rawValue }
+}
+
 /// What the sheet over the map is showing.
 enum ActiveSheet: Identifiable, Equatable {
   case stop(String)
   case bus(String)  // vehicle id
+  case journey
   case settings
   case routes
   case search
@@ -15,7 +22,7 @@ enum ActiveSheet: Identifiable, Equatable {
   /// dismissing and presenting a new one.
   var id: String {
     switch self {
-    case .stop, .bus: "detail"
+    case .stop, .bus, .journey: "detail"
     case .settings: "settings"
     case .routes: "routes"
     case .search: "search"
@@ -24,7 +31,7 @@ enum ActiveSheet: Identifiable, Equatable {
 
   var isDetail: Bool {
     switch self {
-    case .stop, .bus: true
+    case .stop, .bus, .journey: true
     default: false
     }
   }
@@ -39,6 +46,12 @@ struct CameraRequest: Equatable {
   let minimumZoom: Double
 }
 
+/// Asks the map to show all of some coordinates at once.
+struct FitRequest: Equatable {
+  let id = UUID()
+  let coordinates: [Coordinate]
+}
+
 /// App-wide state: the timetable, live buses, what is selected, and the arrivals shown for it.
 @MainActor @Observable
 final class AppModel {
@@ -50,6 +63,7 @@ final class AppModel {
 
   let settings: AppSettings
   let location = LocationController()
+  let plan = PlanModel()
 
   private(set) var phase: Phase = .loading
   private(set) var schedule: Schedule?
@@ -77,6 +91,23 @@ final class AppModel {
   var sheet: ActiveSheet? {
     didSet { if sheet != oldValue { selectionChanged() } }
   }
+  var mode: AppMode = .map {
+    didSet {
+      guard mode != oldValue else { return }
+      menuOpen = false
+      if mode != .map, sheet != nil { sheet = nil }
+      refreshStatus()
+      restartPolling()  // predictions are needed in every mode but the plain map
+    }
+  }
+  var menuOpen = false
+  /// A place the rider long-pressed on the map, waiting for them to say what to do with it.
+  var droppedPin: PlanPoint?
+  /// The journey drawn on the map, with the lines to draw.
+  private(set) var mapJourney: Journey?
+  private(set) var journeyLines: [JourneyPolyline] = []
+  private(set) var fitRequest: FitRequest?
+  private(set) var status: ServiceStatus?
   /// A route the user has tapped to look at on its own; every other route is dimmed.
   var focusedRouteID: String?
   private(set) var cameraRequest: CameraRequest?
@@ -131,6 +162,11 @@ final class AppModel {
   var activeAlerts: [ServiceAlert] {
     let now = Date()
     return alerts.filter { $0.isActive(at: now) }
+  }
+
+  /// Alerts in force, without those that only concern routes the rider hides.
+  var visibleActiveAlerts: [ServiceAlert] {
+    activeAlerts.filter { $0.routeIDs.isEmpty || $0.routeIDs.contains { !hiddenRoutes.contains($0) } }
   }
 
   var upcomingAlerts: [ServiceAlert] {
@@ -195,6 +231,51 @@ final class AppModel {
         focusFromBus = true
       }
     }
+  }
+
+  // MARK: Journeys
+
+  /// Runs the planner with what the app currently knows.
+  func searchJourneys() async {
+    await plan.search(schedule: schedule, predictions: predictions, vehicles: vehicles, here: location.location)
+  }
+
+  /// Draws a journey on the map and opens its summary.
+  func showOnMap(_ journey: Journey) {
+    guard let schedule else { return }
+    let lines = journey.polylines(schedule: schedule)
+    mapJourney = journey
+    journeyLines = lines
+    mode = .map
+    sheet = .journey
+    fitRequest = FitRequest(coordinates: lines.flatMap(\.coordinates))
+  }
+
+  func clearJourney() {
+    mapJourney = nil
+    journeyLines = []
+    if sheet == .journey { sheet = nil }
+  }
+
+  /// Starts a trip from the rider's location (or the previous start) to `point`, in the planner.
+  func startDirections(to point: PlanPoint) {
+    plan.to = .point(point)
+    if plan.from == nil || plan.from == plan.to { plan.from = .myLocation }
+    plan.clearResults()
+    mapJourney = nil
+    journeyLines = []
+    mode = .plan
+    location.start()
+  }
+
+  /// Starts a trip from `point` to wherever the rider wants to go.
+  func startDirections(from point: PlanPoint) {
+    plan.from = .point(point)
+    if plan.to == plan.from { plan.to = nil }
+    plan.clearResults()
+    mapJourney = nil
+    journeyLines = []
+    mode = .plan
   }
 
   func clearSelection() {
@@ -371,14 +452,22 @@ final class AppModel {
         lastAlertFetch = Date()
         if let snapshot = try? await client.fetch(.alerts) { alerts = snapshot.alerts }
       }
-      if sheet?.isDetail == true {
-        // Trip predictions are about 250 KB, so they are only fetched while a stop or bus is open.
+      if sheet?.isDetail == true || mode != .map {
+        // Trip predictions are about 250 KB, so they are only fetched while a stop, a bus, the service board or the
+        // planner needs them.
         if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }
       }
       refreshArrivals()
+      refreshStatus()
       let interval = max(5, settings.values.updateInterval)
       try? await Task.sleep(for: .seconds(interval))
     }
+  }
+
+  /// Recomputes the service board when it is on screen.
+  func refreshStatus() {
+    guard mode == .info, let schedule else { return }
+    status = ServiceStatusBuilder.build(schedule: schedule, predictions: predictions, vehicles: vehicles, now: Date())
   }
 
   /// A moving bus more than 150 m from its trip's line is treated as off its usual route. Standing buses (at a terminal

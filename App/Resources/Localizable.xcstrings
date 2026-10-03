@@ -1255,6 +1255,983 @@
           }
         }
       }
+    },
+    "Menu": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メニュー"
+          }
+        }
+      }
+    },
+    "Routes, stops and live buses": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "路線・バス停・ライブのバス"
+          }
+        }
+      }
+    },
+    "Service info": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行情報"
+          }
+        }
+      }
+    },
+    "Delays, detours and cancellations": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遅れ・迂回・運休"
+          }
+        }
+      }
+    },
+    "Plan a trip": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乗換案内"
+          }
+        }
+      }
+    },
+    "Routes with transfers": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乗換を含む経路検索"
+          }
+        }
+      }
+    },
+    "Data provided under license granted by City of Madison, WI, Metro Transit. Map © OpenStreetMap contributors.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data provided under license granted by City of Madison, WI, Metro Transit. 地図 © OpenStreetMap contributors."
+          }
+        }
+      }
+    },
+    "buses on the road": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "台が運行中"
+          }
+        }
+      }
+    },
+    "%lld alerts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld alert"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld alerts"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "警報 %lld件"
+          }
+        }
+      }
+    },
+    "%lld routes late": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld route late"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld routes late"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遅れ %lld路線"
+          }
+        }
+      }
+    },
+    "No late routes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遅れている路線なし"
+          }
+        }
+      }
+    },
+    "My stops": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイバス停"
+          }
+        }
+      }
+    },
+    "No service alerts": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行情報はありません"
+          }
+        }
+      }
+    },
+    "Detours and alerts": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "迂回と警報"
+          }
+        }
+      }
+    },
+    "Routes with an alert are drawn dashed on the map. The city does not publish the detour paths; the details link to its detour page.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "警報のある路線は地図上で破線になります。市は迂回経路そのものを公開していないため、詳細は市の迂回案内ページへのリンクです。"
+          }
+        }
+      }
+    },
+    "Coming up": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今後の予定"
+          }
+        }
+      }
+    },
+    "No buses are reporting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置を送信しているバスがありません。"
+          }
+        }
+      }
+    },
+    "No routes are running more than five minutes late.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5分以上遅れている路線はありません。"
+          }
+        }
+      }
+    },
+    "Delays right now": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の遅れ"
+          }
+        }
+      }
+    },
+    "Measured from each bus's predicted arrival at its next stop compared with the timetable. Buses without a prediction are not counted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "各バスの次のバス停への到着予測と時刻表を比べて計測しています。予測のないバスは数えていません。"
+          }
+        }
+      }
+    },
+    "No cancelled trips or skipped stops reported": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運休・通過のバス停の報告はありません"
+          }
+        }
+      }
+    },
+    "Cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運休"
+          }
+        }
+      }
+    },
+    "%lld stops are being skipped by some trips": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一部の便が %lld か所のバス停を通過しています"
+          }
+        }
+      }
+    },
+    "Cancellations": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運休"
+          }
+        }
+      }
+    },
+    "and %lld more": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほか %lld件"
+          }
+        }
+      }
+    },
+    "Not reporting a position (%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置を送信していない便（%lld）"
+          }
+        }
+      }
+    },
+    "These trips should be running by the timetable, but no bus reports being on them. The bus may be running without live tracking, or the trip may not be running. Times shown for them come from the timetable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻表上は運行中のはずですが、位置を送信しているバスがありません。追跡なしで走っているか、運行していない可能性があります。これらの時刻は時刻表によるものです。"
+          }
+        }
+      }
+    },
+    "Updated %lld s ago": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld秒前に更新"
+          }
+        }
+      }
+    },
+    "%lld buses": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld bus"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld buses"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld台"
+          }
+        }
+      }
+    },
+    "No prediction": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予測なし"
+          }
+        }
+      }
+    },
+    "No buses soon": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まもなく来るバスはありません"
+          }
+        }
+      }
+    },
+    "The timetable is not loaded yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻表がまだ読み込まれていません。"
+          }
+        }
+      }
+    },
+    "Your location is not available. Choose a starting stop or turn on location.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在地を取得できません。出発のバス停を選ぶか、位置情報をオンにしてください。"
+          }
+        }
+      }
+    },
+    "Choose a place": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所を選択"
+          }
+        }
+      }
+    },
+    "From": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出発"
+          }
+        }
+      }
+    },
+    "To": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "到着"
+          }
+        }
+      }
+    },
+    "Start": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出発地"
+          }
+        }
+      }
+    },
+    "Destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目的地"
+          }
+        }
+      }
+    },
+    "Swap start and destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出発地と目的地を入れ替え"
+          }
+        }
+      }
+    },
+    "Leave": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出発"
+          }
+        }
+      }
+    },
+    "Leave now": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今すぐ出発"
+          }
+        }
+      }
+    },
+    "Depart at": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻を指定"
+          }
+        }
+      }
+    },
+    "Time": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻"
+          }
+        }
+      }
+    },
+    "Find routes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "経路を検索"
+          }
+        }
+      }
+    },
+    "Finding routes…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "経路を検索中…"
+          }
+        }
+      }
+    },
+    "Choose where you are going. Journeys take live delays into account for buses that are reporting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行き先を選んでください。位置を送信しているバスは、ライブの遅れを考慮します。"
+          }
+        }
+      }
+    },
+    "No bus journey found. The stops may be too far apart, or no buses run in the next few hours.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バスの経路が見つかりません。バス停が遠すぎるか、数時間以内に運行がない可能性があります。"
+          }
+        }
+      }
+    },
+    "Walking times are estimated from straight-line distance. Times marked live use each bus's predicted arrival.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "徒歩の時間は直線距離からの推定です。「ライブ」の時刻は各バスの到着予測を使っています。"
+          }
+        }
+      }
+    },
+    "Walking times are estimated from straight-line distance.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "徒歩の時間は直線距離からの推定です。"
+          }
+        }
+      }
+    },
+    "Direct": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直通"
+          }
+        }
+      }
+    },
+    "%lld transfers": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld transfer"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld transfers"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乗換 %lld回"
+          }
+        }
+      }
+    },
+    "walk": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "徒歩"
+          }
+        }
+      }
+    },
+    "Tight transfer": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乗換が短い"
+          }
+        }
+      }
+    },
+    "First bus is leaving now": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最初のバスはまもなく出発します"
+          }
+        }
+      }
+    },
+    "First bus in %lld min from %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最初のバスは %2$@ から %1$lld分後"
+          }
+        }
+      }
+    },
+    "Show on map": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地図で見る"
+          }
+        }
+      }
+    },
+    "Walk %@ to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ まで徒歩 %1$@"
+          }
+        }
+      }
+    },
+    "Route %@ to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 路線 %@ 行き"
+          }
+        }
+      }
+    },
+    "Board at %@ · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ で乗車 · %@"
+          }
+        }
+      }
+    },
+    "Get off at %@ · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ で降車 · %@"
+          }
+        }
+      }
+    },
+    "%lld stops": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld stop"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld stops"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld停留所"
+          }
+        }
+      }
+    },
+    "Transfer · %lld min to connect": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乗換 · 接続まで %lld分"
+          }
+        }
+      }
+    },
+    "Back to results": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "結果に戻る"
+          }
+        }
+      }
+    },
+    "No journey": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "経路なし"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        }
+      }
+    },
+    "Location is turned off for Headway. You can turn it on in Settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Headway の位置情報がオフです。設定アプリでオンにできます。"
+          }
+        }
+      }
+    },
+    "Search for a bus stop, or for a place such as a building or an address.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バス停、または建物や住所などの場所を検索してください。"
+          }
+        }
+      }
+    },
+    "Searching places…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所を検索中…"
+          }
+        }
+      }
+    },
+    "Place search needs a connection.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所の検索には通信が必要です。"
+          }
+        }
+      }
+    },
+    "Places": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所"
+          }
+        }
+      }
+    },
+    "Place names are looked up with Apple Maps, which needs a connection.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "場所の名前は Apple マップで検索するため、通信が必要です。"
+          }
+        }
+      }
+    },
+    "Stop, place or address": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バス停・場所・住所"
+          }
+        }
+      }
+    },
+    "%lld h": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld時間"
+          }
+        }
+      }
+    },
+    "%lld h %lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld時間%lld分"
+          }
+        }
+      }
+    },
+    "Dropped pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドロップしたピン"
+          }
+        }
+      }
+    },
+    "Directions to here": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここへの経路"
+          }
+        }
+      }
+    },
+    "Directions from here": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここからの経路"
+          }
+        }
+      }
+    },
+    "%lld buses more than 5 min late": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld bus more than 5 min late"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld buses more than 5 min late"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld台が5分以上遅れ"
+          }
+        }
+      }
+    },
+    "Not on a route": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "路線に割り当てなし"
+          }
+        }
+      }
     }
   }
 }

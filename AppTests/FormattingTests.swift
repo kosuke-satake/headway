@@ -11,12 +11,25 @@ import UIKit
     #expect("FITCHBURG/CADDIS".prettyHeadsign == "Fitchburg/Caddis")
   }
 
-  @Test func delayWording() {
+  /// The wording is localised, so these tests check structure (which cases read the same, which differ, and that the
+  /// minutes appear) rather than English text.
+  @Test func delayWording() throws {
     #expect(TimeText.delay(nil) == nil)
-    #expect(TimeText.delay(20) == "On time")
-    #expect(TimeText.delay(-25) == "On time")
-    #expect(TimeText.delay(125) == "2 min late")
-    #expect(TimeText.delay(-190) == "3 min early")
+    let onTime = try #require(TimeText.delay(0))
+    #expect(TimeText.delay(20) == onTime)
+    #expect(TimeText.delay(-25) == onTime)
+    let late = try #require(TimeText.delay(125))
+    let early = try #require(TimeText.delay(-190))
+    #expect(late != onTime && early != onTime && late != early)
+    #expect(late.contains("2"))
+    #expect(early.contains("3"))
+  }
+
+  @Test func durations() {
+    #expect(TimeText.duration(30).contains("1"))  // never "0 min"
+    #expect(TimeText.duration(29 * 60 + 20).contains("29"))
+    let long = TimeText.duration(65 * 60)
+    #expect(long.contains("1") && long.contains("5"))
   }
 
   @Test func clockFormats() {

@@ -11,7 +11,13 @@ time, and the next arrivals at any stop. English UI with a Japanese localization
   name on each bus.
 - **Live arrivals.** Tap a stop to see the next buses, live where a bus is reporting ("4 min · 1 min late") and from
   the timetable otherwise, plus the full timetable for any of the next 7 days.
-- **Service alerts.** Detours and other alerts that affect a stop's routes appear at the top of its sheet.
+- **Service alerts.** Detours and other alerts that affect a stop's routes appear at the top of its sheet. Routes with
+  an alert in force are drawn dashed, and a bus far from its usual line is ringed in orange.
+- **Modes** (hamburger menu, top left): the Map; **Service info** (alerts, delays per route, cancelled trips, trips
+  that should be running but report no position, and the next buses at your favourite stops); and **Plan a trip**.
+- **Trip planner.** From your location, a stop, a place found by name (Apple Maps, needs a connection) or a pin you
+  long-press on the map, to anywhere. It finds journeys with walking and transfers, takes the live delay of reporting
+  buses into account, shows them step by step and draws them on the map.
 - **Follow a bus.** Tap a bus to see its next stops with predicted times.
 - **Focus.** Tap a route to see only that route and its stops; hide routes you never use.
 - **Search** by stop name or sign number; favourites, recents and nearby stops.
@@ -54,7 +60,7 @@ must be re-signed every 7 days.
 ## Quality checks
 
 ```bash
-swift test                                                       # data layer (31 tests)
+swift test                                                       # data layer (55 tests)
 xcodebuild test -project Headway.xcodeproj -scheme Headway \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO   # app tests (15)
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO   # app tests (16)
 ```

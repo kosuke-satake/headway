@@ -40,8 +40,16 @@ struct MapContainer: UIViewRepresentable {
       case .stop(let id): model.selectStop(id)
       case .bus(let id): model.selectBus(id)
       case .route(let id): model.toggleFocus(route: id)
-      case .empty: if model.sheet?.isDetail == true { model.clearSelection() }
+      case .empty:
+        // A journey's summary stays open while looking around the map; a stop or bus sheet closes.
+        switch model.sheet {
+        case .stop?, .bus?: model.clearSelection()
+        default: break
+        }
       }
+    }
+    coordinator.onLongPress = { [model] latitude, longitude in
+      model.droppedPin = PlanPoint(name: String(localized: "Dropped pin"), coordinate: Coordinate(latitude: latitude, longitude: longitude))
     }
     coordinator.onCameraIdle = { [model] latitude, longitude, zoom in
       guard model.settings.values.rememberMapPosition else { return }
@@ -66,7 +74,30 @@ struct MapContainer: UIViewRepresentable {
     state.locationAuthorized = model.location.isAuthorized
     state.alertRoutes = model.alertRouteIDs
     state.offRouteVehicles = model.offRouteVehicleIDs
-    context.coordinator.apply(state, camera: model.cameraRequest)
+    if let journey = model.mapJourney {
+      state.journeyID = journey.id
+      let routes = model.orderedRoutes
+      let palette = model.settings.values.routePalette
+      state.journeyLines = model.journeyLines.map { line in
+        let color = line.routeID.flatMap { id in routes.first { $0.id == id } }.map {
+          let fill = RouteColors.fill(for: $0, palette: palette == .quiet ? .agency : palette, among: routes)
+          return colorScheme == .dark ? RouteColors.forDarkMap(fill) : fill
+        }
+        return JourneyLine(
+          coordinates: line.coordinates.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) },
+          color: color, isWalk: line.routeID == nil)
+      }
+      var points: [(CLLocationCoordinate2D, String)] = []
+      for (index, line) in model.journeyLines.enumerated() {
+        guard let first = line.coordinates.first, let last = line.coordinates.last else { continue }
+        let begin = CLLocationCoordinate2D(latitude: first.latitude, longitude: first.longitude)
+        let end = CLLocationCoordinate2D(latitude: last.latitude, longitude: last.longitude)
+        if index == 0 { points.append((begin, "start")) } else { points.append((begin, "transfer")) }
+        if index == model.journeyLines.count - 1 { points.append((end, "end")) }
+      }
+      state.journeyPoints = points
+    }
+    context.coordinator.apply(state, camera: model.cameraRequest, fit: model.fitRequest)
   }
 
   static func dismantleUIView(_ mapView: MLNMapView, coordinator: MapCoordinator) {
@@ -77,6 +108,7 @@ struct MapContainer: UIViewRepresentable {
 /// Owns the map's style layers and keeps them in sync with `MapState`.
 final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDelegate {
   var onTap: ((MapTap) -> Void)?
+  var onLongPress: ((Double, Double) -> Void)?
   var onCameraIdle: ((Double, Double, Double) -> Void)?
 
   private weak var mapView: MLNMapView?
@@ -84,6 +116,7 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
   private var state = MapState()
   private var appliedStyleSchedule: String?
   private var lastCameraID: UUID?
+  private var lastFitID: UUID?
   private let animator = BusAnimator()
   private var displayLink: CADisplayLink?
   private var idleWork: DispatchWorkItem?
@@ -93,6 +126,10 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
     tap.delegate = self
     mapView.addGestureRecognizer(tap)
+    let hold = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+    hold.minimumPressDuration = 0.6
+    hold.delegate = self
+    mapView.addGestureRecognizer(hold)
   }
 
   func detach() {
@@ -102,7 +139,7 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
 
   // MARK: Applying state
 
-  func apply(_ new: MapState, camera: CameraRequest?) {
+  func apply(_ new: MapState, camera: CameraRequest?, fit: FitRequest?) {
     let old = state
     state = new
     guard let mapView else { return }
@@ -120,7 +157,9 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     if let layers {
       let styleChanged = old.prefs != new.prefs || old.focusedRoute != new.focusedRoute || old.isDark != new.isDark
         || old.schedule?.feedVersion != new.schedule?.feedVersion || old.alertRoutes != new.alertRoutes
-      if styleChanged { layers.applyStyle(new) }
+      if styleChanged || old.journeyID != new.journeyID { layers.applyStyle(new) }
+      if styleChanged { layers.applyJourneyStyle(new) }
+      if old.journeyID != new.journeyID { layers.setJourney(new) }
       if styleChanged || old.routesByStop.count != new.routesByStop.count { layers.setStops(new) }
       if old.selectedStop != new.selectedStop { layers.setSelectedStop(new) }
       if old.vehicles != new.vehicles || old.prefs.hiddenRoutes != new.prefs.hiddenRoutes
@@ -140,6 +179,10 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
       lastCameraID = camera.id
       fly(camera)
     }
+    if let fit, fit.id != lastFitID {
+      lastFitID = fit.id
+      fitBounds(fit.coordinates)
+    }
   }
 
   private func buildLayers(style: MLNStyle) {
@@ -148,6 +191,8 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     layers = built
     appliedStyleSchedule = schedule.feedVersion
     built.applyStyle(state)
+    built.applyJourneyStyle(state)
+    built.setJourney(state)
     built.setStops(state)
     built.setSelectedStop(state)
     animator.update(
@@ -192,6 +237,22 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
       CLLocationCoordinate2D(latitude: request.latitude - shift, longitude: request.longitude), zoomLevel: zoom, animated: true)
   }
 
+  /// Zooms to show all of `coordinates`, leaving room for the sheet at the bottom and the buttons at the top.
+  private func fitBounds(_ coordinates: [Coordinate]) {
+    guard let mapView, let first = coordinates.first else { return }
+    var minLat = first.latitude, maxLat = first.latitude, minLon = first.longitude, maxLon = first.longitude
+    for c in coordinates {
+      minLat = min(minLat, c.latitude)
+      maxLat = max(maxLat, c.latitude)
+      minLon = min(minLon, c.longitude)
+      maxLon = max(maxLon, c.longitude)
+    }
+    let bounds = MLNCoordinateBounds(
+      sw: CLLocationCoordinate2D(latitude: minLat, longitude: minLon), ne: CLLocationCoordinate2D(latitude: maxLat, longitude: maxLon))
+    let padding = UIEdgeInsets(top: 130, left: 40, bottom: max(state.bottomInset, 320) + 30, right: 40)
+    mapView.setVisibleCoordinateBounds(bounds, edgePadding: padding, animated: true, completionHandler: nil)
+  }
+
   // MARK: MLNMapViewDelegate
 
   func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -214,6 +275,12 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
 
   func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
     true
+  }
+
+  @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+    guard gesture.state == .began, let mapView else { return }
+    let coordinate = mapView.convert(gesture.location(in: mapView), toCoordinateFrom: mapView)
+    onLongPress?(coordinate.latitude, coordinate.longitude)
   }
 
   @objc private func handleTap(_ gesture: UITapGestureRecognizer) {

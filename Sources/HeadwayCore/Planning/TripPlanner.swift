@@ -410,10 +410,18 @@ public struct TripPlanner: Sendable {
     return count
   }
 
-  /// Orders the legs, merges nothing, and rejects journeys that end up with no ride and no walk.
+  /// Puts the legs in order and, when the journey starts with a walk to a bus, moves that walk as late as it can be:
+  /// the rider should leave when they need to, not at the moment they asked.
   private func finish(_ reversed: [JourneyLeg], start: Date) -> Journey? {
-    let legs = Array(reversed.reversed())
+    var legs = Array(reversed.reversed())
     guard !legs.isEmpty else { return nil }
+    if legs.count >= 2, case .walk(let walk) = legs[0], case .ride(let ride) = legs[1] {
+      let duration = walk.end.timeIntervalSince(walk.start)
+      let latestStart = ride.depart.addingTimeInterval(-duration)
+      if latestStart > walk.start {
+        legs[0] = .walk(WalkLeg(from: walk.from, to: walk.to, start: latestStart, end: ride.depart, meters: walk.meters))
+      }
+    }
     return Journey(legs: legs)
   }
 }
