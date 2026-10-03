@@ -49,3 +49,24 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
+  HeadwayTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - AppTests
+    dependencies:
+      - target: Headway
+      - package: Headway
+        product: HeadwayCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.kosuke.headway.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Headway:
+    build:
+      targets:
+        Headway: all
+    test:
+      targets:
+        - HeadwayTests

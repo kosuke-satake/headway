@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct HeadwayApp: App {
-  @State private var model = AppModel()
+  @State private var model = AppModel(settings: AppSettings())
 
   var body: some Scene {
     WindowGroup {

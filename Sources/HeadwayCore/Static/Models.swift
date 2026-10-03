@@ -8,6 +8,15 @@ public struct Route: Sendable, Identifiable, Hashable {
   public let colorHex: String
   public let textColorHex: String
   public let sortOrder: Int
+
+  public init(id: String, shortName: String, longName: String, colorHex: String, textColorHex: String, sortOrder: Int) {
+    self.id = id
+    self.shortName = shortName
+    self.longName = longName
+    self.colorHex = colorHex
+    self.textColorHex = textColorHex
+    self.sortOrder = sortOrder
+  }
 }
 
 public struct Stop: Sendable, Identifiable, Hashable {
@@ -36,6 +45,25 @@ public struct StopTime: Sendable, Hashable {
   /// Seconds after midnight of the service day; can exceed 86,400 for trips that run past midnight.
   public let arrival: Int
   public let departure: Int
+}
+
+/// One scheduled visit to a stop, as stored in the per-stop index.
+public struct StopVisit: Sendable, Hashable {
+  public let tripID: String
+  public let sequence: Int
+  public let arrival: Int
+  public let departure: Int
+}
+
+/// A scheduled departure from a particular stop on a particular service date.
+public struct ScheduledDeparture: Sendable, Hashable {
+  public let tripID: String
+  public let routeID: String
+  public let headsign: String
+  public let directionID: Int
+  public let serviceDate: ServiceDate
+  public let sequence: Int
+  public let time: Date
 }
 
 public struct Coordinate: Sendable, Hashable {

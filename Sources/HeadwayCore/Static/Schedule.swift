@@ -25,6 +25,8 @@ public struct Schedule: Sendable {
   public let calendars: [String: ServiceCalendar]
   /// `service_id` -> date -> exception type (1 = added, 2 = removed).
   public let calendarExceptions: [String: [ServiceDate: Int]]
+  /// Every scheduled visit to each stop, ordered by time of day. Built once so a stop's board is cheap to compute.
+  public let visitsByStop: [String: [StopVisit]]
 
   // MARK: Loading
 
@@ -135,6 +137,7 @@ public struct Schedule: Sendable {
 
     // stop_times
     var stopTimes: [String: [StopTime]] = [:]
+    var visitsByStop: [String: [StopVisit]] = [:]
     let timeFile = CSVFile(data: try file("stop_times.txt"))
     let ih = timeFile.header
     let tripCol = ih["trip_id"], stopCol = ih["stop_id"], seqCol = ih["stop_sequence"]
@@ -144,17 +147,20 @@ public struct Schedule: Sendable {
       let arrival = parseGTFSTime(row.string(arrCol))
       // GTFS allows one of the two to be blank on interpolated stops; use whichever exists.
       guard let seconds = arrival ?? departure else { return }
-      stopTimes[row.string(tripCol), default: []].append(
-        StopTime(
-          stopID: row.string(stopCol),
-          sequence: row.int(seqCol) ?? 0,
-          arrival: seconds,
-          departure: departure ?? seconds
-        )
+      let tripID = row.string(tripCol)
+      let stopID = row.string(stopCol)
+      let sequence = row.int(seqCol) ?? 0
+      stopTimes[tripID, default: []].append(
+        StopTime(stopID: stopID, sequence: sequence, arrival: seconds, departure: departure ?? seconds)
+      )
+      visitsByStop[stopID, default: []].append(
+        StopVisit(tripID: tripID, sequence: sequence, arrival: seconds, departure: departure ?? seconds)
       )
     }
     for key in stopTimes.keys { stopTimes[key]!.sort { $0.sequence < $1.sequence } }
+    for key in visitsByStop.keys { visitsByStop[key]!.sort { $0.departure < $1.departure } }
     self.stopTimes = stopTimes
+    self.visitsByStop = visitsByStop
 
     // shapes
     var rawShapes: [String: [(Int, Coordinate)]] = [:]
@@ -237,6 +243,51 @@ public struct Schedule: Sendable {
       }
     }
     return result
+  }
+
+  /// Scheduled departures from `stopID` between `from` and `until`, soonest first.
+  ///
+  /// The last stop of a trip is left out: nobody boards there. Service dates are checked one day back so that
+  /// trips running past midnight are found.
+  public func scheduledDepartures(from stopID: String, from start: Date, until end: Date) -> [ScheduledDeparture] {
+    guard let visits = visitsByStop[stopID] else { return [] }
+    let firstDate = ServiceDate(start, in: timeZone).adding(days: -1, in: timeZone)
+    let lastDate = ServiceDate(end, in: timeZone)
+    var result: [ScheduledDeparture] = []
+    var date = firstDate
+    while date <= lastDate {
+      let midnight = date.midnight(in: timeZone)
+      let active = activeServiceIDs(on: date)
+      for visit in visits {
+        let time = midnight.addingTimeInterval(TimeInterval(visit.departure))
+        guard time >= start, time <= end else { continue }
+        guard let trip = trips[visit.tripID], active.contains(trip.serviceID) else { continue }
+        if stopTimes[visit.tripID]?.last?.sequence == visit.sequence { continue }
+        result.append(
+          ScheduledDeparture(
+            tripID: trip.id, routeID: trip.routeID, headsign: trip.headsign, directionID: trip.directionID,
+            serviceDate: date, sequence: visit.sequence, time: time)
+        )
+      }
+      date = date.adding(days: 1, in: timeZone)
+    }
+    return result.sorted { $0.time < $1.time }
+  }
+
+  /// The service date a trip is most plausibly running on at `moment`: today's or yesterday's, whichever has the
+  /// trip's service active and its span closest to `moment`.
+  public func serviceDate(of tripID: String, near moment: Date) -> ServiceDate? {
+    guard let trip = trips[tripID], let times = stopTimes[tripID], let first = times.first, let last = times.last else {
+      return nil
+    }
+    let today = ServiceDate(moment, in: timeZone)
+    var best: (date: ServiceDate, distance: Int)?
+    for date in [today, today.adding(days: -1, in: timeZone)] where activeServiceIDs(on: date).contains(trip.serviceID) {
+      let seconds = Int(moment.timeIntervalSince(date.midnight(in: timeZone)))
+      let distance = seconds < first.departure ? first.departure - seconds : max(0, seconds - last.arrival)
+      if best == nil || distance < best!.distance { best = (date, distance) }
+    }
+    return best?.date
   }
 
   /// The scheduled arrival instant of `trip` at `sequence`, given the service date the trip runs on.

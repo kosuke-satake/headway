@@ -4,7 +4,7 @@ import Testing
 @testable import HeadwayCore
 
 /// A tiny feed written to a temporary folder, so the tests do not depend on downloaded data.
-private func makeFeed() throws -> URL {
+func makeFeed() throws -> URL {
   let dir = FileManager.default.temporaryDirectory.appendingPathComponent("headway-feed-\(UUID().uuidString)")
   try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
   let files: [String: String] = [
