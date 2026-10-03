@@ -10,7 +10,7 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Intended users: Madison bus riders, first the author. Later other cities (GTFS is a standard).
 - Core user journey: open the app, see the map at once, see where the buses are, tap a stop, see when the next bus
   really arrives.
-- Out of scope for now: trip planning, fares, other cities, Android.
+- Out of scope for now: trip planning, fares, other cities, Android, iPad, notifications, widgets.
 - UX is the main goal: it must feel instant and smooth. Live data comes first, the timetable is a fallback.
 
 ## Technical context
@@ -25,15 +25,29 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Live vs scheduled: the UI must show clearly which times are live and which come only from the timetable.
 - Layout: the root `Package.swift` holds the data layer and a tool; `App/` is the iOS app on top of it, generated
   into `Headway.xcodeproj` by XcodeGen from `project.yml` (the project file is not committed).
-  - `App/AppModel.swift`: timetable (downloaded once, cached in Application Support, refreshed daily) and a 10 s poll of
-    live vehicles. `App/MapContainer.swift`: MapLibre map; one casing and one line layer per route, a stop layer and a
-    bus layer per route. `App/RootView.swift`: status pill (live / stale / connecting) and the failure banner.
-    `App/BaseStyle.swift`: loads `App/Resources/basemap-style.json` and points it at the bundled tiles and glyphs
-    (placeholders `__PMTILES__` and `__GLYPHS__` become `file://` URLs); falls back to a plain background.
+  - `App/AppModel.swift`: observable app state. Loads the timetable (cache in Application Support, else the bundled
+    seed, else a download; refreshes at most daily and swaps only when the feed version changes), polls vehicles
+    (interval from settings), fetches trip predictions only while a stop or bus sheet is open, recomputes the stop
+    board, and holds selection (`ActiveSheet`), route focus and camera requests.
+  - `App/Settings/`: `Preferences.swift` (all user options as one tolerant Codable value, decoding falls back to
+    defaults per key), `AppSettings.swift` (observable store in UserDefaults, favourites, recents, reset).
+  - `App/Map/`: `MapContainer.swift` (UIViewRepresentable and `MapCoordinator`: applies `MapState` diffs, camera,
+    taps), `MapLayers.swift` (sources and layers; routes and stops under basemap labels, buses on top),
+    `MapState.swift` (state snapshot, `MapPreferences` subset, `RouteLook`), `BusAnimator.swift` (glide between
+    reports).
+  - `App/Sheets/`: `StopSheet`, `BusSheet`, `TimetableView`, `RoutesSheet`, `SearchSheet`, `SettingsView`,
+    `Components` (route badge, live status, circle button).
+  - `App/Support/`: `Formatting.swift` (times, delays, headsigns), `Theme.swift` (map theme, route palettes, colour
+    helpers), `LocationController.swift` (permission asked only when the user taps the location button), `Haptics`.
+  - `App/RootView.swift`: map, status pill, controls, focus chip, sheet routing (stop and bus share one sheet
+    identity so selecting another does not re-present it).
+  - `App/Resources/`: `Localizable.xcstrings` (English keys, Japanese values; add both when adding UI text),
+    `ja.lproj`/`en.lproj` InfoPlist strings, `Assets.xcassets` (icon), basemap styles and glyphs.
+  - `AppTests/`: Swift Testing for preferences, settings, formatting and colours.
   - Offline basemap: `tools/fetch_basemap.sh` cuts `data/maps/madison.pmtiles` (17 MB, Protomaps build 2026-10-03,
     zoom 0-15, bbox -89.62,42.93,-89.20,43.20) and fetches Noto Sans glyphs into `App/Resources/glyphs/` (committed,
-    0.8 MB). `tools/style/generate.mjs` (Node, `@protomaps/basemaps`, flavor `white`) writes the style JSON; rerun it
-    after changing the flavor. The style has no remote URLs, so the map needs no network. Tiles are bundled into the
+    0.8 MB). `tools/style/generate.mjs` (Node, `@protomaps/basemaps`; flavors `white` and `dark`, points of interest removed)
+    writes both style JSON files; rerun it after changing a flavor. The style has no remote URLs, so the map needs no network. Tiles are bundled into the
     app by `project.yml`, so run `tools/fetch_basemap.sh` before building. Attribution: (c) OpenStreetMap contributors.
   - `Sources/HeadwayCore/Static/`: `CSV.swift` (byte-level CSV scanner), `Models.swift` (Route, Stop, Trip, StopTime,
     ServiceDate), `Schedule.swift` (in-memory static GTFS from a zip or folder; service calendar; trips in progress).
@@ -71,7 +85,29 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
 - App: `xcodegen generate`, then
   `xcodebuild -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO`.
+- Tests: `swift test` (data layer, 25) and
+  `xcodebuild test -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO`
+  (app, 15).
+- Before building the app: `tools/fetch_basemap.sh` and `tools/fetch_timetable.sh` (both outputs are bundled by
+  `project.yml` and not committed), then `xcodegen generate`.
+- Icon: `swift tools/make_icon.swift App/Resources/Assets.xcassets/AppIcon.appiconset` (light, dark, tinted).
+- Simulator notes: `simctl ... booted` can point at the wrong device when two are booted; use the UDID. Typing into
+  a search field through the control tool is slow; wait before the next tap.
+- The 24 h feed report is written by a launchd job (`data/launchd/dev.kosuke.headway.report.plist`) to
+  `docs/feed-analysis-2026-10-03.md` at 2026-10-04 17:10 CDT.
 - Format, lint: not set up yet.
+
+## Known limits and next steps
+
+- Not yet run on a physical iPhone; Dynamic Type, VoiceOver on the map, and low-power behaviour are unchecked.
+- Predictions come from the city's trip-updates feed, which has no delay field and covers only trips with a bus;
+  the board therefore shows the timetable for the rest. Whether predictions are biased is unverified (see
+  `docs/data-sources.md`).
+- Bus markers trail the real bus by up to one update interval plus the feed's own latency.
+- Publishing: the data terms contain an indemnification clause (see `docs/data-sources.md`); the App Store needs the
+  paid Developer Program; map tiles need the OSM attribution (already in Settings and the map's info button).
+- Ideas not started: notifications when a bus is near, widgets, other cities (GTFS is generic, the feed URLs and
+  basemap box are the Madison-specific parts), iPad layout.
 
 ## Definition of done
 

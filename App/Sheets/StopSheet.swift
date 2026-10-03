@@ -68,7 +68,7 @@ struct StopSheet: View {
   private var board: some View {
     List {
       if model.arrivals.isEmpty {
-        Text(model.schedule == nil ? "Loading timetable…" : "No buses are scheduled here soon.")
+        Text(LocalizedStringKey(model.schedule == nil ? "Loading timetable…" : "No buses are scheduled here soon."))
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
           .listRowSeparator(.hidden)
@@ -114,7 +114,7 @@ struct ArrivalRow: View {
         Spacer(minLength: 8)
         VStack(alignment: .trailing, spacing: 1) {
           Text(text.arrival(arrival, now: now))
-            .font(.title3.weight(.semibold)).monospacedDigit()
+            .font(.title3.weight(arrival.status == .live ? .semibold : .regular)).monospacedDigit()
           if model.settings.values.arrivalStyle == .countdown, arrival.minutes(from: now) < 60 {
             Text(text.clock(arrival.expected)).font(.caption).foregroundStyle(.secondary).monospacedDigit()
           }
@@ -124,7 +124,8 @@ struct ArrivalRow: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .disabled(arrival.vehicle == nil)
+    // Only buses with a position can be shown on the map; timetable-only rows stay fully legible but do nothing.
+    .allowsHitTesting(arrival.vehicle != nil)
     .accessibilityElement(children: .combine)
   }
 }

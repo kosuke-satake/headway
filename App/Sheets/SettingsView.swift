@@ -6,6 +6,7 @@ struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var confirmReset = false
   @State private var refreshing = false
+  @State private var refreshMessage: LocalizedStringKey?
 
   var body: some View {
     @Bindable var settings = model.settings
@@ -97,7 +98,11 @@ struct SettingsView: View {
           Button {
             Task {
               refreshing = true
-              await model.refreshTimetable()
+              switch await model.refreshTimetable() {
+              case .updated: refreshMessage = "Timetable updated."
+              case .upToDate: refreshMessage = "The timetable is up to date."
+              case .failed: refreshMessage = "Could not reach the server."
+              }
               refreshing = false
             }
           } label: {
@@ -107,6 +112,7 @@ struct SettingsView: View {
             }
           }
           .disabled(refreshing)
+          if let refreshMessage { Text(refreshMessage).font(.footnote).foregroundStyle(.secondary) }
         } header: {
           Text("Data")
         } footer: {

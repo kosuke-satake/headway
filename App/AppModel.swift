@@ -122,12 +122,11 @@ final class AppModel {
     await loadSchedule()
   }
 
-  /// Throws away the cached timetable and downloads a fresh one.
-  func refreshTimetable() async {
-    if let directory = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) {
-      try? FileManager.default.removeItem(at: directory.appendingPathComponent("mmt_gtfs.zip"))
-    }
-    await loadSchedule()
+  enum RefreshResult { case updated, upToDate, failed }
+
+  /// Downloads the timetable now, whatever the cache says.
+  func refreshTimetable() async -> RefreshResult {
+    await refreshFromNetwork(force: true)
   }
 
   func retry() async {
@@ -196,19 +195,93 @@ final class AppModel {
 
   // MARK: Timetable
 
+  private static var cacheURL: URL? {
+    try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+      .appendingPathComponent("mmt_gtfs.zip")
+  }
+
+  /// The timetable to start with: the cached download, else the copy bundled with the app, else nothing.
+  private func startingZip() -> URL? {
+    guard let cache = Self.cacheURL else { return nil }
+    if FileManager.default.fileExists(atPath: cache.path) { return cache }
+    guard let seed = Bundle.main.url(forResource: "mmt_gtfs", withExtension: "zip") else { return nil }
+    try? FileManager.default.copyItem(at: seed, to: cache)
+    // Mark the copy as old so that the first launch with a connection fetches a fresh timetable.
+    try? FileManager.default.setAttributes([.modificationDate: Date.distantPast], ofItemAtPath: cache.path)
+    return FileManager.default.fileExists(atPath: cache.path) ? cache : seed
+  }
+
   private func loadSchedule() async {
     do {
-      let url = try await cachedScheduleZip()
-      let loaded = try await Task.detached(priority: .userInitiated) { try Schedule.load(zipAt: url) }.value
-      let index = await Task.detached(priority: .utility) { Self.routesByStop(in: loaded) }.value
-      let headsigns = await Task.detached(priority: .utility) { Self.headsigns(in: loaded) }.value
-      schedule = loaded
-      routesByStop = index
-      headsignsByRoute = headsigns
+      var url = startingZip()
+      if url == nil {
+        // Nothing local: the first launch needs the network.
+        guard await downloadZip(replacingCache: true) else { throw URLError(.notConnectedToInternet) }
+        url = Self.cacheURL
+      }
+      guard let url else { throw URLError(.fileDoesNotExist) }
+      try await apply(try await Self.parse(url))
       phase = .ready
-      refreshArrivals()
+      Task { _ = await refreshFromNetwork(force: false) }
     } catch {
       phase = .failed(error.localizedDescription)
+    }
+  }
+
+  private struct Parsed {
+    let schedule: Schedule
+    let routesByStop: [String: [String]]
+    let headsigns: [String: [String]]
+  }
+
+  private static func parse(_ url: URL) async throws -> Parsed {
+    let schedule = try await Task.detached(priority: .userInitiated) { try Schedule.load(zipAt: url) }.value
+    let index = await Task.detached(priority: .utility) { Self.routesByStop(in: schedule) }.value
+    let headsigns = await Task.detached(priority: .utility) { Self.headsigns(in: schedule) }.value
+    return Parsed(schedule: schedule, routesByStop: index, headsigns: headsigns)
+  }
+
+  private func apply(_ parsed: Parsed) async throws {
+    schedule = parsed.schedule
+    routesByStop = parsed.routesByStop
+    headsignsByRoute = parsed.headsigns
+    refreshArrivals()
+  }
+
+  /// Fetches the timetable at most once a day (or when `force` is set). A new feed replaces the loaded one only if its
+  /// version differs; a failed attempt (offline) changes nothing.
+  private func refreshFromNetwork(force: Bool) async -> RefreshResult {
+    guard let cache = Self.cacheURL else { return .failed }
+    let modified = (try? cache.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+    if !force, Date().timeIntervalSince(modified) < 86_400 { return .upToDate }
+    do {
+      let (temporary, response) = try await URLSession.shared.download(from: Self.scheduleURL)
+      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return .failed }
+      let fresh = try await Self.parse(temporary)
+      if fresh.schedule.feedVersion == schedule?.feedVersion {
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cache.path)
+        return .upToDate
+      }
+      try? FileManager.default.removeItem(at: cache)
+      try FileManager.default.moveItem(at: temporary, to: cache)
+      try await apply(fresh)
+      return .updated
+    } catch {
+      return .failed
+    }
+  }
+
+  /// Used only when there is no local copy at all.
+  private func downloadZip(replacingCache: Bool) async -> Bool {
+    guard let cache = Self.cacheURL else { return false }
+    do {
+      let (temporary, response) = try await URLSession.shared.download(from: Self.scheduleURL)
+      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return false }
+      try? FileManager.default.removeItem(at: cache)
+      try FileManager.default.moveItem(at: temporary, to: cache)
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -232,28 +305,6 @@ final class AppModel {
     return counts.mapValues { byHeadsign in
       byHeadsign.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.prefix(2).map(\.key)
     }
-  }
-
-  /// The timetable zip in Application Support. It is downloaded once; a cached copy is used when offline.
-  private func cachedScheduleZip() async throws -> URL {
-    let directory = try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let cached = directory.appendingPathComponent("mmt_gtfs.zip")
-    let age = (try? cached.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-      .map { Date().timeIntervalSince($0) }
-    // Refresh at most once a day; a failed refresh falls back to the cached copy.
-    if age == nil || age! > 86_400 {
-      do {
-        let (temporary, response) = try await URLSession.shared.download(from: Self.scheduleURL)
-        if (response as? HTTPURLResponse)?.statusCode == 200 {
-          try? FileManager.default.removeItem(at: cached)
-          try FileManager.default.moveItem(at: temporary, to: cached)
-        }
-      } catch {
-        if age == nil { throw error }
-      }
-    }
-    return cached
   }
 
   // MARK: Live data

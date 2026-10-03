@@ -40,9 +40,20 @@ takes about 2 s in a debug build, so the app will import it into SQLite once ins
   as predicted time minus timetable time.
 - Alerts: detours such as "L - Aberg RR Detour" and "80 - Randall Detour", with route ids.
 
+## Preliminary findings (35 minutes, Saturday afternoon; not conclusive)
+
+From `feedanalysis report` on the first 35 minutes of the recording:
+
+- About 95% of scheduled trips in progress had a bus position; about 5% had none (route R and 80 stood out, on very
+  few samples). No trip was found with an assigned bus but no position.
+- About 2% of bus-minutes came from vehicles reporting no trip id.
+- Positions older than 60 s: about 1%.
+- Predicted arrival at the next stop minus the timetable: median +92 s, p95 +655 s, about 23% more than 5 minutes
+  late, none more than 5 minutes early. This may be real lateness or a systematic offset in how predictions are
+  built; it is not verified. The 24 h report (`docs/feed-analysis-2026-10-03.md`, written automatically) is the
+  better basis.
+
 ## Open questions
 
-- How often does a scheduled trip in progress have no vehicle position? The 24-hour recording and
-  `feedanalysis report` answer this. A first run on 7 samples (not meaningful yet) put it near 8%.
-- How far do predicted arrivals drift from the timetable? The same first run showed a median of about +2.5 minutes
-  on a Saturday afternoon. Not verified: it could be real lateness or a systematic offset in how predictions are built.
+- Do the preliminary numbers above hold over a full day, and do they differ by hour and route?
+- Are predictions biased late? Compare predicted and observed arrival times (needs positions near stops).

@@ -32,7 +32,11 @@ struct RootView: View {
       case .bus(let id):
         BusSheet(vehicleID: id).modifier(DetailSheetStyle(height: Self.detailHeight))
       case .settings:
-        SettingsView().presentationDetents([.large]).presentationBackground(Color(.systemGroupedBackground))
+        // Half height with the map still usable, so a change (colours, marker size) can be watched on the map.
+        SettingsView()
+          .presentationDetents([.medium, .large])
+          .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+          .presentationBackground(Color(.systemGroupedBackground))
       case .routes:
         RoutesSheet().presentationDetents([.medium, .large])
       case .search:
