@@ -1211,6 +1211,17 @@
           }
         }
       }
+    },
+    "Shows details": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳細を表示"
+          }
+        }
+      }
     }
   }
 }

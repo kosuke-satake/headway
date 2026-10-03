@@ -84,11 +84,14 @@ public enum RealtimeDecoder {
   }
 
   private static func serviceAlert(_ entityID: String, _ a: TransitRealtime_Alert) -> ServiceAlert {
-    let header = a.headerText.translation.first(where: { $0.language.isEmpty || $0.language.hasPrefix("en") })?.text
-      ?? a.headerText.translation.first?.text ?? ""
+    func text(_ translated: TransitRealtime_TranslatedString) -> String {
+      translated.translation.first(where: { $0.language.isEmpty || $0.language.hasPrefix("en") })?.text
+        ?? translated.translation.first?.text ?? ""
+    }
     return ServiceAlert(
       entityID: entityID,
-      header: header,
+      header: text(a.headerText),
+      detail: text(a.descriptionText),
       routeIDs: a.informedEntity.filter { $0.hasRouteID }.map(\.routeID),
       stopIDs: a.informedEntity.filter { $0.hasStopID }.map(\.stopID)
     )

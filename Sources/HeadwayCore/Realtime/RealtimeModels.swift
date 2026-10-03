@@ -46,9 +46,12 @@ public struct TripPrediction: Sendable, Hashable {
   public let stops: [StopPrediction]
 }
 
-public struct ServiceAlert: Sendable, Hashable {
+public struct ServiceAlert: Sendable, Hashable, Identifiable {
+  public var id: String { entityID }
   public let entityID: String
   public let header: String
+  /// The longer text, when the city provides one.
+  public let detail: String
   public let routeIDs: [String]
   public let stopIDs: [String]
 }

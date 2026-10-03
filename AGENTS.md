@@ -27,7 +27,8 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
   into `Headway.xcodeproj` by XcodeGen from `project.yml` (the project file is not committed).
   - `App/AppModel.swift`: observable app state. Loads the timetable (cache in Application Support, else the bundled
     seed, else a download; refreshes at most daily and swaps only when the feed version changes), polls vehicles
-    (interval from settings), fetches trip predictions only while a stop or bus sheet is open, recomputes the stop
+    (interval from settings), fetches service alerts once a minute, fetches trip predictions only while a stop or bus sheet
+    is open, recomputes the stop
     board, and holds selection (`ActiveSheet`), route focus and camera requests.
   - `App/Settings/`: `Preferences.swift` (all user options as one tolerant Codable value, decoding falls back to
     defaults per key), `AppSettings.swift` (observable store in UserDefaults, favourites, recents, reset).
@@ -85,7 +86,7 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
 - App: `xcodegen generate`, then
   `xcodebuild -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO`.
-- Tests: `swift test` (data layer, 25) and
+- Tests: `swift test` (data layer, 31) and
   `xcodebuild test -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO`
   (app, 15).
 - Before building the app: `tools/fetch_basemap.sh` and `tools/fetch_timetable.sh` (both outputs are bundled by

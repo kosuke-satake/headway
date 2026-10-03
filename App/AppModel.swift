@@ -55,6 +55,7 @@ final class AppModel {
   private(set) var schedule: Schedule?
   private(set) var vehicles: [VehicleSample] = []
   private(set) var predictions: [TripPrediction] = []
+  private(set) var alerts: [ServiceAlert] = []
   private(set) var arrivals: [Arrival] = []
   /// Route ids serving each stop, ordered like the route list.
   private(set) var routesByStop: [String: [String]] = [:]
@@ -81,6 +82,7 @@ final class AppModel {
   @ObservationIgnored private var started = false
   @ObservationIgnored private var isActive = true
   @ObservationIgnored private var focusFromBus = false
+  @ObservationIgnored private var lastAlertFetch = Date.distantPast
 
   static let scheduleURL = URL(string: "https://transitdata.cityofmadison.com/GTFS/mmt_gtfs.zip")!
 
@@ -329,6 +331,11 @@ final class AppModel {
         if Task.isCancelled { return }  // a restart cancels the request; that is not a failure
         liveFailing = true
       }
+      if Date().timeIntervalSince(lastAlertFetch) > 60 {
+        // Service alerts change rarely and are tiny (about 3 KB).
+        lastAlertFetch = Date()
+        if let snapshot = try? await client.fetch(.alerts) { alerts = snapshot.alerts }
+      }
       if sheet?.isDetail == true {
         // Trip predictions are about 250 KB, so they are only fetched while a stop or bus is open.
         if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }
@@ -363,6 +370,14 @@ final class AppModel {
     guard let schedule else { return [] }
     let prediction = predictions.first { $0.tripID == vehicle.tripID }
     return Arrivals.remainingStops(schedule: schedule, tripID: vehicle.tripID, now: Date(), prediction: prediction)
+  }
+
+  /// Alerts that concern this stop, either directly or through a route that serves it.
+  func alerts(forStop id: String) -> [ServiceAlert] {
+    let routes = Set(routesByStop[id] ?? [])
+    return alerts.filter { alert in
+      alert.stopIDs.contains(id) || !routes.isDisjoint(with: alert.routeIDs)
+    }
   }
 
   func headsign(of tripID: String) -> String { schedule?.trips[tripID]?.headsign ?? "" }

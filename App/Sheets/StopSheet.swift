@@ -67,6 +67,12 @@ struct StopSheet: View {
 
   private var board: some View {
     List {
+      let alerts = model.alerts(forStop: stopID)
+      if !alerts.isEmpty {
+        Section {
+          ForEach(alerts) { AlertRow(alert: $0) }
+        }
+      }
       if model.arrivals.isEmpty {
         Text(LocalizedStringKey(model.schedule == nil ? "Loading timetable…" : "No buses are scheduled here soon."))
           .foregroundStyle(.secondary)
@@ -127,5 +133,35 @@ struct ArrivalRow: View {
     // Only buses with a position can be shown on the map; timetable-only rows stay fully legible but do nothing.
     .allowsHitTesting(arrival.vehicle != nil)
     .accessibilityElement(children: .combine)
+  }
+}
+
+/// A service alert such as a detour. The headline always shows; the details open on tap.
+struct AlertRow: View {
+  let alert: ServiceAlert
+  @State private var expanded = false
+
+  var body: some View {
+    Button {
+      if !alert.detail.isEmpty { withAnimation(.snappy) { expanded.toggle() } }
+    } label: {
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 4) {
+          Text(alert.header).font(.subheadline.weight(.semibold)).multilineTextAlignment(.leading)
+          if expanded, !alert.detail.isEmpty {
+            Text(alert.detail).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+          }
+        }
+        Spacer(minLength: 0)
+        if !alert.detail.isEmpty {
+          Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary)
+        }
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityElement(children: .combine)
+    .accessibilityHint(alert.detail.isEmpty ? Text("") : Text("Shows details"))
   }
 }
