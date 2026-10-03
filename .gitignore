@@ -19,3 +19,6 @@ models/
 # XcodeGen output (regenerate with `xcodegen`)
 *.xcodeproj
 build/
+
+# Node tooling
+node_modules/

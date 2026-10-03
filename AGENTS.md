@@ -19,16 +19,22 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
   UI strings in English with a maintained Japanese String Catalog.
 - Data: see `docs/data-sources.md`. Static GTFS is imported on the device; vehicle positions are polled every 10-15
   seconds and interpolated between polls; trip updates (about 250 KB) are fetched only while a stop is open.
-- Offline map: Madison-area OSM vector tiles stored on the device. How MapLibre Native on iOS reads a local tile
-  archive (PMTiles or MBTiles) is not verified yet; check it first. Any tile download needs the user's approval
-  (file, source, size, destination).
+- Offline map: Madison-area OSM vector tiles in one PMTiles file that the app bundles (MapLibre Native reads
+  `pmtiles://file://...` itself; verified in the simulator). PMTiles do not take part in MapLibre's offline-pack cache,
+  so the app owns the whole file. Any download needs the user's approval (file, source, size, destination).
 - Live vs scheduled: the UI must show clearly which times are live and which come only from the timetable.
 - Layout: the root `Package.swift` holds the data layer and a tool; `App/` is the iOS app on top of it, generated
   into `Headway.xcodeproj` by XcodeGen from `project.yml` (the project file is not committed).
   - `App/AppModel.swift`: timetable (downloaded once, cached in Application Support, refreshed daily) and a 10 s poll of
     live vehicles. `App/MapContainer.swift`: MapLibre map; one casing and one line layer per route, a stop layer and a
     bus layer per route. `App/RootView.swift`: status pill (live / stale / connecting) and the failure banner.
-    `App/BaseStyle.swift`: plain-background style, a stand-in until the offline basemap is wired in.
+    `App/BaseStyle.swift`: loads `App/Resources/basemap-style.json` and points it at the bundled tiles and glyphs
+    (placeholders `__PMTILES__` and `__GLYPHS__` become `file://` URLs); falls back to a plain background.
+  - Offline basemap: `tools/fetch_basemap.sh` cuts `data/maps/madison.pmtiles` (17 MB, Protomaps build 2026-10-03,
+    zoom 0-15, bbox -89.62,42.93,-89.20,43.20) and fetches Noto Sans glyphs into `App/Resources/glyphs/` (committed,
+    0.8 MB). `tools/style/generate.mjs` (Node, `@protomaps/basemaps`, flavor `white`) writes the style JSON; rerun it
+    after changing the flavor. The style has no remote URLs, so the map needs no network. Tiles are bundled into the
+    app by `project.yml`, so run `tools/fetch_basemap.sh` before building. Attribution: (c) OpenStreetMap contributors.
   - `Sources/HeadwayCore/Static/`: `CSV.swift` (byte-level CSV scanner), `Models.swift` (Route, Stop, Trip, StopTime,
     ServiceDate), `Schedule.swift` (in-memory static GTFS from a zip or folder; service calendar; trips in progress).
   - `Sources/HeadwayCore/Realtime/`: `RealtimeDecoder.swift` (protobuf to plain structs), `RealtimeModels.swift`,

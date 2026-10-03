@@ -20,7 +20,16 @@ targets:
     type: application
     platform: iOS
     sources:
-      - App
+      - path: App
+        excludes:
+          - Resources/glyphs
+      # Label glyphs keep their folder layout inside the bundle: glyphs/<font>/<range>.pbf.
+      - path: App/Resources/glyphs
+        type: folder
+        buildPhase: resources
+      # Offline basemap, fetched by tools/fetch_basemap.sh (not committed).
+      - path: data/maps/madison.pmtiles
+        buildPhase: resources
     dependencies:
       - package: Headway
         product: HeadwayCore

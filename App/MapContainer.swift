@@ -51,13 +51,22 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate {
     }
     if routesDrawn {
       if busSource == nil, let schedule = pendingSchedule { busSource = RouteLayers.addBuses(schedule: schedule, to: style) }
-      busSource?.shape = RouteLayers.busFeatures(pendingVehicles)
+      busSource?.shape = RouteLayers.busFeatures(pendingVehicles, schedule: pendingSchedule)
     }
   }
 }
 
 /// Builds the route, stop and bus layers. Each route has its own layers so that it can later be highlighted or hidden.
 enum RouteLayers {
+  /// Routes and stops sit under the basemap's text labels (street and place names) but above its fills and roads.
+  private static func insertBelowLabels(_ layer: MLNStyleLayer, in style: MLNStyle) {
+    if let firstLabel = style.layers.first(where: { $0 is MLNSymbolStyleLayer }) {
+      style.insertLayer(layer, below: firstLabel)
+    } else {
+      style.addLayer(layer)
+    }
+  }
+
   static func add(schedule: Schedule, to style: MLNStyle) {
     // Route lines: one polyline per distinct shape, tagged with its route.
     var routeOfShape: [String: String] = [:]
@@ -90,7 +99,7 @@ enum RouteLayers {
       casing.lineWidth = NSExpression(format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)", [10: 3.5, 16: 9])
       casing.lineCap = NSExpression(forConstantValue: "round")
       casing.lineJoin = NSExpression(forConstantValue: "round")
-      style.addLayer(casing)
+      insertBelowLabels(casing, in: style)
     }
     for route in schedule.routes.values.sorted(by: { $0.sortOrder < $1.sortOrder }) {
       let line = MLNLineStyleLayer(identifier: "route-\(route.id)", source: routeSource)
@@ -99,7 +108,7 @@ enum RouteLayers {
       line.lineWidth = NSExpression(format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)", [10: 2, 16: 6])
       line.lineCap = NSExpression(forConstantValue: "round")
       line.lineJoin = NSExpression(forConstantValue: "round")
-      style.addLayer(line)
+      insertBelowLabels(line, in: style)
     }
 
     let stopLayer = MLNCircleStyleLayer(identifier: "stops", source: stopSource)
@@ -108,7 +117,21 @@ enum RouteLayers {
     stopLayer.circleStrokeWidth = NSExpression(forConstantValue: 1.25)
     stopLayer.circleRadius = NSExpression(format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)", [11: 1.5, 14: 3, 17: 6])
     stopLayer.circleOpacity = NSExpression(format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)", [11: 0, 12.5: 1])
-    style.addLayer(stopLayer)
+    insertBelowLabels(stopLayer, in: style)
+
+    // Stop names appear once zoomed in far enough to read them.
+    let names = MLNSymbolStyleLayer(identifier: "stop-names", source: stopSource)
+    names.minimumZoomLevel = 15
+    names.text = NSExpression(forKeyPath: "name")
+    names.textFontNames = NSExpression(forConstantValue: ["Noto Sans Regular"])
+    names.textFontSize = NSExpression(forConstantValue: 11)
+    names.textColor = NSExpression(forConstantValue: UIColor(white: 0.15, alpha: 1))
+    names.textHaloColor = NSExpression(forConstantValue: UIColor.white)
+    names.textHaloWidth = NSExpression(forConstantValue: 1.5)
+    names.textAnchor = NSExpression(forConstantValue: "top")
+    names.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: 0.9)))
+    names.maximumTextWidth = NSExpression(forConstantValue: 8)
+    style.addLayer(names)
   }
 
   static func addBuses(schedule: Schedule, to style: MLNStyle) -> MLNShapeSource {
@@ -118,22 +141,35 @@ enum RouteLayers {
       let ring = MLNCircleStyleLayer(identifier: "bus-ring-\(route.id)", source: source)
       ring.predicate = NSPredicate(format: "route == %@", route.id)
       ring.circleColor = NSExpression(forConstantValue: UIColor.white)
-      ring.circleRadius = NSExpression(forConstantValue: 9.5)
+      ring.circleRadius = NSExpression(forConstantValue: 12.5)
       style.addLayer(ring)
       let dot = MLNCircleStyleLayer(identifier: "bus-\(route.id)", source: source)
       dot.predicate = NSPredicate(format: "route == %@", route.id)
       dot.circleColor = NSExpression(forConstantValue: UIColor(hex: route.colorHex))
-      dot.circleRadius = NSExpression(forConstantValue: 7)
+      dot.circleRadius = NSExpression(forConstantValue: 10.5)
       style.addLayer(dot)
+      let label = MLNSymbolStyleLayer(identifier: "bus-label-\(route.id)", source: source)
+      label.predicate = NSPredicate(format: "route == %@", route.id)
+      label.text = NSExpression(forKeyPath: "label")
+      label.textFontNames = NSExpression(forConstantValue: ["Noto Sans Medium"])
+      label.textFontSize = NSExpression(forConstantValue: 11)
+      label.textColor = NSExpression(forConstantValue: UIColor(hex: route.textColorHex))
+      label.textAllowsOverlap = NSExpression(forConstantValue: true)
+      label.textIgnoresPlacement = NSExpression(forConstantValue: true)
+      style.addLayer(label)
     }
     return source
   }
 
-  static func busFeatures(_ vehicles: [VehicleSample]) -> MLNShapeCollectionFeature {
+  static func busFeatures(_ vehicles: [VehicleSample], schedule: Schedule?) -> MLNShapeCollectionFeature {
     let features = vehicles.map { vehicle -> MLNPointFeature in
       let point = MLNPointFeature()
       point.coordinate = CLLocationCoordinate2D(latitude: vehicle.latitude, longitude: vehicle.longitude)
-      point.attributes = ["route": vehicle.routeID, "bearing": vehicle.bearing ?? 0]
+      point.attributes = [
+        "route": vehicle.routeID,
+        "label": schedule?.routes[vehicle.routeID]?.shortName ?? vehicle.routeID,
+        "bearing": vehicle.bearing ?? 0,
+      ]
       return point
     }
     return MLNShapeCollectionFeature(shapes: features)

@@ -1,0 +1,9 @@
+{
+  "name": "headway-style",
+  "private": true,
+  "type": "module",
+  "description": "Generates App/Resources/basemap-style.json from the Protomaps basemap themes.",
+  "dependencies": {
+    "@protomaps/basemaps": "^5.0.0"
+  }
+}
