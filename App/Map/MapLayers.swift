@@ -28,6 +28,7 @@ final class MapLayers {
   private let selectedStopLayer: MLNCircleStyleLayer
   private let stopNames: MLNSymbolStyleLayer
   private let selectedBusLayer: MLNCircleStyleLayer
+  private let offRouteLayer: MLNCircleStyleLayer
   private var busRings: [String: MLNCircleStyleLayer] = [:]
   private var busDots: [String: MLNCircleStyleLayer] = [:]
   private var busLabels: [String: MLNSymbolStyleLayer] = [:]
@@ -87,6 +88,9 @@ final class MapLayers {
 
     selectedBusLayer = MLNCircleStyleLayer(identifier: "selected-bus", source: selectedBusSource)
     style.addLayer(selectedBusLayer)
+    offRouteLayer = MLNCircleStyleLayer(identifier: "off-route", source: busSource)
+    offRouteLayer.predicate = NSPredicate(format: "off == %@", NSNumber(value: true))
+    style.addLayer(offRouteLayer)
     for id in routeIDs {
       let ring = MLNCircleStyleLayer(identifier: "bus-ring-\(id)", source: busSource)
       ring.predicate = NSPredicate(format: "route == %@", id)
@@ -133,6 +137,10 @@ final class MapLayers {
       line.lineColor = NSExpression(forConstantValue: look.fill)
       line.lineOpacity = NSExpression(forConstantValue: look.opacity)
       line.lineWidth = Self.ramp([10: 2 * width, 16: 6 * width])
+      // A route with an alert in force is dashed: its service differs from the usual.
+      let alerted = state.alertRoutes.contains(id)
+      line.lineCap = NSExpression(forConstantValue: alerted ? "butt" : "round")
+      line.lineDashPattern = alerted ? NSExpression(forConstantValue: [1.8, 1.4]) : nil
       casing.lineColor = NSExpression(forConstantValue: theme.routeCasing)
       casing.lineOpacity = NSExpression(forConstantValue: look.opacity)
       casing.lineWidth = Self.ramp([10: 2 * width + 1.5, 16: 6 * width + 3])
@@ -189,6 +197,11 @@ final class MapLayers {
     stopNames.textAnchor = NSExpression(forConstantValue: "top")
     stopNames.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: 0.9)))
     stopNames.maximumTextWidth = NSExpression(forConstantValue: 8)
+
+    offRouteLayer.circleColor = NSExpression(forConstantValue: UIColor.clear)
+    offRouteLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.systemOrange)
+    offRouteLayer.circleStrokeWidth = NSExpression(forConstantValue: 3)
+    offRouteLayer.circleRadius = NSExpression(forConstantValue: prefs.markerSize.radius + 5)
 
     selectedBusLayer.circleColor = NSExpression(forConstantValue: UIColor.clear)
     selectedBusLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.systemBlue)
@@ -248,6 +261,7 @@ final class MapLayers {
         "id": vehicle.id,
         "route": vehicle.routeID,
         "label": state.schedule?.routes[vehicle.routeID]?.shortName ?? vehicle.routeID,
+        "off": state.offRouteVehicles.contains(vehicle.id),
       ]
       features.append(point)
       if vehicle.id == state.selectedVehicle { selected = point }

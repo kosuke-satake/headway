@@ -56,6 +56,10 @@ final class AppModel {
   private(set) var vehicles: [VehicleSample] = []
   private(set) var predictions: [TripPrediction] = []
   private(set) var alerts: [ServiceAlert] = []
+  /// Buses that are far from the line their trip should follow, so probably on a detour.
+  private(set) var offRouteVehicleIDs: Set<String> = []
+  /// When on, the stop sheet and timetable also show routes the user chose to hide.
+  var showHiddenRoutes = false
   private(set) var arrivals: [Arrival] = []
   /// Route ids serving each stop, ordered like the route list.
   private(set) var routesByStop: [String: [String]] = [:]
@@ -107,6 +111,35 @@ final class AppModel {
   }
 
   func route(_ id: String) -> Route? { schedule?.routes[id] }
+
+  var hiddenRoutes: Set<String> { settings.values.hiddenRoutes }
+
+  /// Arrivals for the selected stop, without routes the user hides (unless they asked to see them).
+  var boardArrivals: [Arrival] {
+    showHiddenRoutes ? arrivals : arrivals.filter { !hiddenRoutes.contains($0.routeID) }
+  }
+
+  var hiddenArrivalCount: Int { arrivals.count - arrivals.filter { !hiddenRoutes.contains($0.routeID) }.count }
+
+  /// Routes serving a stop, without hidden ones unless the user asked to see them.
+  func visibleRoutes(atStop id: String) -> [String] {
+    let all = routesByStop[id] ?? []
+    return showHiddenRoutes ? all : all.filter { !hiddenRoutes.contains($0) }
+  }
+
+  /// Alerts in force right now.
+  var activeAlerts: [ServiceAlert] {
+    let now = Date()
+    return alerts.filter { $0.isActive(at: now) }
+  }
+
+  var upcomingAlerts: [ServiceAlert] {
+    let now = Date()
+    return alerts.filter { $0.isUpcoming(at: now) }
+  }
+
+  /// Routes with an alert in force: drawn dashed on the map.
+  var alertRouteIDs: Set<String> { Set(activeAlerts.flatMap(\.routeIDs)) }
 
   func timeText() -> TimeText {
     TimeText(
@@ -186,6 +219,7 @@ final class AppModel {
   }
 
   private func selectionChanged() {
+    showHiddenRoutes = false
     // Closing a bus sheet releases the route that selecting the bus focused.
     if sheet == nil, focusFromBus {
       focusedRouteID = nil
@@ -323,6 +357,7 @@ final class AppModel {
       do {
         let snapshot = try await client.fetch(.vehicles)
         vehicles = snapshot.vehicles
+        offRouteVehicleIDs = computeOffRoute(snapshot.vehicles)
         lastLiveUpdate = Date()
         liveFailing = false
       } catch is CancellationError {
@@ -344,6 +379,18 @@ final class AppModel {
       let interval = max(5, settings.values.updateInterval)
       try? await Task.sleep(for: .seconds(interval))
     }
+  }
+
+  /// A moving bus more than 150 m from its trip's line is treated as off its usual route. Standing buses (at a terminal
+  /// or a stop) are ignored, since they are often parked off the line.
+  private func computeOffRoute(_ vehicles: [VehicleSample]) -> Set<String> {
+    guard let schedule else { return [] }
+    var result: Set<String> = []
+    for vehicle in vehicles {
+      if let speed = vehicle.speed, speed < 0.5 { continue }
+      if let distance = schedule.distanceFromRoute(of: vehicle), distance > 150 { result.insert(vehicle.id) }
+    }
+    return result
   }
 
   /// Recomputes the board for the selected stop.
@@ -372,12 +419,16 @@ final class AppModel {
     return Arrivals.remainingStops(schedule: schedule, tripID: vehicle.tripID, now: Date(), prediction: prediction)
   }
 
-  /// Alerts that concern this stop, either directly or through a route that serves it.
+  /// Alerts in force that concern this stop, directly or through a route that serves it.
   func alerts(forStop id: String) -> [ServiceAlert] {
-    let routes = Set(routesByStop[id] ?? [])
-    return alerts.filter { alert in
+    let routes = Set(visibleRoutes(atStop: id))
+    return activeAlerts.filter { alert in
       alert.stopIDs.contains(id) || !routes.isDisjoint(with: alert.routeIDs)
     }
+  }
+
+  func alerts(forRoute id: String) -> [ServiceAlert] {
+    activeAlerts.filter { $0.routeIDs.contains(id) }
   }
 
   func headsign(of tripID: String) -> String { schedule?.trips[tripID]?.headsign ?? "" }

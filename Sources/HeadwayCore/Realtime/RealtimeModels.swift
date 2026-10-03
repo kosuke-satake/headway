@@ -52,8 +52,34 @@ public struct ServiceAlert: Sendable, Hashable, Identifiable {
   public let header: String
   /// The longer text, when the city provides one.
   public let detail: String
+  /// A page with more information, such as a detour map, when the city provides one.
+  public let url: URL?
+  /// `DETOUR`, `NO_SERVICE`, `REDUCED_SERVICE`, `SIGNIFICANT_DELAYS`, `STOP_MOVED`, ... or empty.
+  public let effect: String
+  /// When the alert applies. Empty means "always" (the feed gave no period).
+  public let activePeriods: [AlertPeriod]
   public let routeIDs: [String]
   public let stopIDs: [String]
+}
+
+public struct AlertPeriod: Sendable, Hashable {
+  public let start: Date?
+  public let end: Date?
+
+  public func contains(_ moment: Date) -> Bool {
+    (start.map { moment >= $0 } ?? true) && (end.map { moment <= $0 } ?? true)
+  }
+}
+
+extension ServiceAlert {
+  public func isActive(at moment: Date) -> Bool {
+    activePeriods.isEmpty || activePeriods.contains { $0.contains(moment) }
+  }
+
+  /// True when the alert has a period that starts after `moment`.
+  public func isUpcoming(at moment: Date) -> Bool {
+    !isActive(at: moment) && activePeriods.contains { ($0.start ?? .distantPast) > moment }
+  }
 }
 
 public struct RealtimeSnapshot: Sendable {

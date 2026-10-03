@@ -80,7 +80,8 @@ struct TimetableView: View {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = schedule.timeZone
     let end = calendar.date(byAdding: .day, value: 1, to: start)!.addingTimeInterval(-1)
-    let all = schedule.scheduledDepartures(from: stopID, from: start, until: end)
+    var all = schedule.scheduledDepartures(from: stopID, from: start, until: end)
+    if !model.showHiddenRoutes { all = all.filter { !model.hiddenRoutes.contains($0.routeID) } }
     guard let routeFilter else { return all }
     return all.filter { $0.routeID == routeFilter }
   }

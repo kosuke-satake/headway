@@ -1222,6 +1222,39 @@
           }
         }
       }
+    },
+    "Show hidden routes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非表示の路線も表示"
+          }
+        }
+      }
+    },
+    "Detour details": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "迂回の詳細"
+          }
+        }
+      }
+    },
+    "This bus is away from its usual route. A detour is likely.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このバスは通常の経路から外れています。迂回している可能性があります。"
+          }
+        }
+      }
     }
   }
 }

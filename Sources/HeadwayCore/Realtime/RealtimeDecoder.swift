@@ -28,6 +28,11 @@ public enum RealtimeDecoder {
     )
   }
 
+  private static func unique(_ values: [String]) -> [String] {
+    var seen: Set<String> = []
+    return values.filter { seen.insert($0).inserted }
+  }
+
   private static func date(_ seconds: UInt64) -> Date? {
     seconds == 0 ? nil : Date(timeIntervalSince1970: TimeInterval(seconds))
   }
@@ -92,8 +97,15 @@ public enum RealtimeDecoder {
       entityID: entityID,
       header: text(a.headerText),
       detail: text(a.descriptionText),
-      routeIDs: a.informedEntity.filter { $0.hasRouteID }.map(\.routeID),
-      stopIDs: a.informedEntity.filter { $0.hasStopID }.map(\.stopID)
+      url: URL(string: text(a.url)),
+      effect: a.hasEffect ? "\(a.effect)".uppercased() : "",
+      activePeriods: a.activePeriod.map {
+        AlertPeriod(
+          start: $0.hasStart ? Date(timeIntervalSince1970: TimeInterval($0.start)) : nil,
+          end: $0.hasEnd ? Date(timeIntervalSince1970: TimeInterval($0.end)) : nil)
+      },
+      routeIDs: unique(a.informedEntity.filter { $0.hasRouteID }.map(\.routeID)),
+      stopIDs: unique(a.informedEntity.filter { $0.hasStopID }.map(\.stopID))
     )
   }
 }

@@ -48,7 +48,8 @@ struct StopSheet: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Close"))
       }
-      if let routes = model.routesByStop[stop.id], !routes.isEmpty {
+      let routes = model.visibleRoutes(atStop: stop.id)
+      if !routes.isEmpty {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 6) { ForEach(routes, id: \.self) { RouteBadge(routeID: $0, compact: true) } }
         }
@@ -73,7 +74,8 @@ struct StopSheet: View {
           ForEach(alerts) { AlertRow(alert: $0) }
         }
       }
-      if model.arrivals.isEmpty {
+      let arrivals = model.boardArrivals
+      if arrivals.isEmpty {
         Text(LocalizedStringKey(model.schedule == nil ? "Loading timetable…" : "No buses are scheduled here soon."))
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -85,13 +87,19 @@ struct StopSheet: View {
         }
         TimelineView(.periodic(from: .now, by: 10)) { context in
           VStack(spacing: 0) {
-            ForEach(model.arrivals) { arrival in
+            ForEach(arrivals) { arrival in
               ArrivalRow(arrival: arrival, now: context.date)
-              if arrival.id != model.arrivals.last?.id { Divider() }
+              if arrival.id != arrivals.last?.id { Divider() }
             }
           }
         }
         .listRowInsets(EdgeInsets())
+      }
+      if model.hiddenArrivalCount > 0 || model.showHiddenRoutes, !model.hiddenRoutes.isEmpty {
+        Toggle(isOn: Bindable(model).showHiddenRoutes) {
+          Text("Show hidden routes").font(.footnote)
+        }
+        .onChange(of: model.showHiddenRoutes) { _, _ in model.refreshArrivals() }
       }
       NavigationLink(value: stopID) {
         Label("Full timetable", systemImage: "calendar.day.timeline.left")
@@ -151,6 +159,10 @@ struct AlertRow: View {
           Text(alert.header).font(.subheadline.weight(.semibold)).multilineTextAlignment(.leading)
           if expanded, !alert.detail.isEmpty {
             Text(alert.detail).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+            if let url = alert.url {
+              Link(destination: url) { Label("Detour details", systemImage: "arrow.up.right.square") }
+                .font(.footnote.weight(.medium))
+            }
           }
         }
         Spacer(minLength: 0)

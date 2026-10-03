@@ -64,6 +64,8 @@ struct MapContainer: UIViewRepresentable {
     state.isDark = colorScheme == .dark
     state.bottomInset = bottomInset
     state.locationAuthorized = model.location.isAuthorized
+    state.alertRoutes = model.alertRouteIDs
+    state.offRouteVehicles = model.offRouteVehicleIDs
     context.coordinator.apply(state, camera: model.cameraRequest)
   }
 
@@ -117,12 +119,12 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     }
     if let layers {
       let styleChanged = old.prefs != new.prefs || old.focusedRoute != new.focusedRoute || old.isDark != new.isDark
-        || old.schedule?.feedVersion != new.schedule?.feedVersion
+        || old.schedule?.feedVersion != new.schedule?.feedVersion || old.alertRoutes != new.alertRoutes
       if styleChanged { layers.applyStyle(new) }
       if styleChanged || old.routesByStop.count != new.routesByStop.count { layers.setStops(new) }
       if old.selectedStop != new.selectedStop { layers.setSelectedStop(new) }
       if old.vehicles != new.vehicles || old.prefs.hiddenRoutes != new.prefs.hiddenRoutes
-        || old.selectedVehicle != new.selectedVehicle
+        || old.selectedVehicle != new.selectedVehicle || old.offRouteVehicles != new.offRouteVehicles
       {
         if old.vehicles != new.vehicles {
           animator.update(

@@ -100,4 +100,23 @@ func makeFeed() throws -> URL {
     #expect(schedule.trips.keys.allSatisfy { schedule.stopTimes[$0] != nil })
     #expect(schedule.stopTimes.values.joined().allSatisfy { schedule.stops[$0.stopID] != nil })
   }
+
+  @Test(.enabled(if: RealFeedTests.zip != nil)) func plansARealJourney() throws {
+    let schedule = try Schedule.load(zipAt: try #require(Self.zip))
+    func find(_ code: String) -> PlanPoint {
+      let stop = schedule.stops.values.first { $0.code == code }!
+      return PlanPoint(name: stop.name, coordinate: Coordinate(latitude: stop.latitude, longitude: stop.longitude), stopID: stop.id)
+    }
+    // Monday 2026-10-05 09:00 in Madison.
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = schedule.timeZone
+    let start = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5, hour: 9, minute: 0))!
+    let journeys = TripPlanner(schedule: schedule).plan(from: find("10081"), to: find("9759"), departAt: start)  // Capitol Square to Eagan at East Towne
+    #expect(!journeys.isEmpty)
+    for journey in journeys {
+      #expect(journey.arrival > journey.departure)
+      #expect(journey.departure >= start.addingTimeInterval(-1))
+      #expect(journey.duration < 3 * 3600)
+    }
+  }
 }

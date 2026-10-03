@@ -44,6 +44,9 @@ struct MapState {
   /// Height of the bottom sheet that covers the map, so the camera can centre in the visible part.
   var bottomInset: CGFloat = 0
   var locationAuthorized = false
+  /// Routes with an alert in force (drawn dashed) and buses away from their usual line (ringed in orange).
+  var alertRoutes: Set<String> = []
+  var offRouteVehicles: Set<String> = []
 }
 
 /// Colours and visibility of one route, derived from the state.

@@ -15,6 +15,11 @@ struct BusSheet: View {
           header(vehicle)
           Divider()
           List {
+            if model.offRouteVehicleIDs.contains(vehicle.id) {
+              Label("This bus is away from its usual route. A detour is likely.", systemImage: "arrow.triangle.turn.up.right.diamond")
+                .font(.subheadline).foregroundStyle(.orange)
+              ForEach(model.alerts(forRoute: vehicle.routeID)) { AlertRow(alert: $0) }
+            }
             if stops.isEmpty {
               Text("No upcoming stops are known for this bus.").foregroundStyle(.secondary)
             } else {
