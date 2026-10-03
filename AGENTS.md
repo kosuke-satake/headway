@@ -23,9 +23,18 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
   archive (PMTiles or MBTiles) is not verified yet; check it first. Any tile download needs the user's approval
   (file, source, size, destination).
 - Live vs scheduled: the UI must show clearly which times are live and which come only from the timetable.
-- Planned layout: a Swift package for the data layer (GTFS and GTFS-Realtime parsing, no UI, tested with
-  `swift test`), and the app target on top of it. Not created yet.
-- Important directories: `tools/` (recorder and analysis scripts), `docs/`, `data/` (recorded feeds, outside Git).
+- Layout: the root `Package.swift` holds the data layer and a tool; the iOS app target will sit on top (not created
+  yet).
+  - `Sources/HeadwayCore/Static/`: `CSV.swift` (byte-level CSV scanner), `Models.swift` (Route, Stop, Trip, StopTime,
+    ServiceDate), `Schedule.swift` (in-memory static GTFS from a zip or folder; service calendar; trips in progress).
+  - `Sources/HeadwayCore/Realtime/`: `RealtimeDecoder.swift` (protobuf to plain structs), `RealtimeModels.swift`,
+    `RealtimeClient.swift` (async fetch of the three feeds).
+  - `Sources/HeadwayCore/Generated/gtfs-realtime.pb.swift`: generated from `proto/gtfs-realtime.proto`; do not edit.
+  - `Sources/feedanalysis/`: command-line tool that compares recordings with the timetable (`Report.swift`).
+  - `Tests/HeadwayCoreTests/`: Swift Testing. `RealFeedTests` runs only when a downloaded feed exists in `data/feeds/`.
+- Important directories: `tools/` (recorder), `docs/`, `proto/`, `data/` (recorded feeds, logs, launchd plist; outside Git).
+- Findings that shape the design are in `docs/data-sources.md`: predictions carry no delay, so delay is computed
+  against the timetable; positions can be stale by more than a minute.
 - Constraint: free stack only; no paid services. A free personal Apple ID is enough for installing on the user's own
   iPhone (re-signing every 7 days); the paid Developer Program is only needed to distribute.
 
@@ -40,11 +49,17 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 
 ## Commands
 
-- Record feeds: `caffeinate -i python3 tools/record_feeds.py --hours 24` (writes `data/feeds/<date>/`).
+- Record feeds: `caffeinate -i python3 tools/record_feeds.py --hours 24` (writes `data/feeds/<date>/`). The
+  2026-10-03 run was started as a launchd job from `data/launchd/dev.kosuke.headway.recorder.plist` so it survives
+  the session; stop it with `launchctl bootout gui/$(id -u)/dev.kosuke.headway.recorder`.
 - Smoke test of the recorder: `python3 tools/record_feeds.py --once --no-static`.
-- Xcode is installed but the active developer directory is the Command Line Tools. Without `sudo`, prefix commands
-  with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
-- Format, lint, type-check, test, build: not set up yet.
+- Build: `swift build`; test: `swift test`.
+- Analyse a recording: `swift build -c release && .build/release/feedanalysis report data/feeds/<date>`
+  (also `schedule <zip>` and `sample <dir>` / `shape <dir>` to inspect the data).
+- Regenerate protobuf code: `protoc --swift_out=Sources/HeadwayCore/Generated --swift_opt=Visibility=Public -I proto proto/gtfs-realtime.proto`
+  (needs `brew install protobuf swift-protobuf`).
+- Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
+- Format, lint: not set up yet.
 
 ## Definition of done
 
