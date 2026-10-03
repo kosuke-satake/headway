@@ -1,0 +1,17 @@
+# Label managed by `labels`. This file is the source of truth for this folder.
+# status: active | paused | done | archived | unset
+# shelf: where this folder belongs, relative to the workspace root (the parent of this folder)
+schema = 1
+id = "K-0048"
+name = "Headway"
+summary = "Live Madison bus map for iPhone with offline map, all routes and stops, and timetables"
+shelf = "Projects/Software/iOS"
+kind = "git"
+status = "active"
+next = "Record feeds for 24h and analyse trips without vehicle positions; verify offline tile loading in MapLibre"
+github = ""
+tags = []
+related = []
+notes = ""
+created = "2026-10-03"
+updated = "2026-10-03"

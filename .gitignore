@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Python (tools/)
+__pycache__/
+.venv/
+
+# Recorded feeds and downloaded map data (large, reproducible)
+data/
+models/
