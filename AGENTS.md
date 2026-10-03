@@ -23,8 +23,12 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
   archive (PMTiles or MBTiles) is not verified yet; check it first. Any tile download needs the user's approval
   (file, source, size, destination).
 - Live vs scheduled: the UI must show clearly which times are live and which come only from the timetable.
-- Layout: the root `Package.swift` holds the data layer and a tool; the iOS app target will sit on top (not created
-  yet).
+- Layout: the root `Package.swift` holds the data layer and a tool; `App/` is the iOS app on top of it, generated
+  into `Headway.xcodeproj` by XcodeGen from `project.yml` (the project file is not committed).
+  - `App/AppModel.swift`: timetable (downloaded once, cached in Application Support, refreshed daily) and a 10 s poll of
+    live vehicles. `App/MapContainer.swift`: MapLibre map; one casing and one line layer per route, a stop layer and a
+    bus layer per route. `App/RootView.swift`: status pill (live / stale / connecting) and the failure banner.
+    `App/BaseStyle.swift`: plain-background style, a stand-in until the offline basemap is wired in.
   - `Sources/HeadwayCore/Static/`: `CSV.swift` (byte-level CSV scanner), `Models.swift` (Route, Stop, Trip, StopTime,
     ServiceDate), `Schedule.swift` (in-memory static GTFS from a zip or folder; service calendar; trips in progress).
   - `Sources/HeadwayCore/Realtime/`: `RealtimeDecoder.swift` (protobuf to plain structs), `RealtimeModels.swift`,
@@ -59,6 +63,8 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Regenerate protobuf code: `protoc --swift_out=Sources/HeadwayCore/Generated --swift_opt=Visibility=Public -I proto proto/gtfs-realtime.proto`
   (needs `brew install protobuf swift-protobuf`).
 - Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
+- App: `xcodegen generate`, then
+  `xcodebuild -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO`.
 - Format, lint: not set up yet.
 
 ## Definition of done
