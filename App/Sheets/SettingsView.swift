@@ -71,7 +71,7 @@ struct SettingsView: View {
         } header: {
           Text("Live buses")
         } footer: {
-          Text("The city's feed is rebuilt every 30 seconds and each bus reports every 30 seconds, so a position is about 25 seconds old when you see it. Automatic refresh asks right after each rebuild. Estimating moves each bus along its route at its last speed; a veiled bus has not reported for over a minute. Predicted arrival times are fetched only while a stop or bus is open.")
+          Text("The city's feed is rebuilt every 30 seconds and each bus reports every 30 seconds, so a position is about 25 seconds old when you see it. Automatic refresh asks right after each rebuild. Estimating moves each bus along its route at its last speed; a veiled bus has not reported for over a minute. Predicted arrival times are fetched only while a stop or bus is open, the service board or planner is showing, or you are watching routes.")
         }
 
         Section("Times") {
@@ -93,6 +93,8 @@ struct SettingsView: View {
             Link(destination: url) { Label("Language and location", systemImage: "gear") }
           }
         }
+
+        notificationsSection
 
         Section("Trip planner") {
           NavigationLink("Trip options") { PlanOptionsForm().navigationTitle("Trip options").navigationBarTitleDisplayMode(.inline) }
@@ -148,6 +150,40 @@ struct SettingsView: View {
       } message: {
         Text("Favorites and recent stops are kept.")
       }
+      .notificationsDeniedAlert()
+    }
+  }
+
+  // MARK: Notifications
+
+  @ViewBuilder private var notificationsSection: some View {
+    @Bindable var settings = model.settings
+    Section {
+      Toggle("Notify me about watched routes", isOn: Binding(
+        get: { settings.values.watchEnabled },
+        set: { on in
+          if on {
+            Task {
+              if await WatchNotifier.authorize() { settings.values.watchEnabled = true } else { model.notificationsDenied = true }
+            }
+          } else {
+            settings.values.watchEnabled = false
+          }
+        }))
+      if settings.values.watchEnabled {
+        NavigationLink {
+          WatchedRoutesView()
+        } label: {
+          LabeledContent("Routes to watch", value: "\(settings.values.watchedRoutes.count)")
+        }
+        Toggle("A bus is running late", isOn: $settings.values.watchLate)
+        Toggle("A bus is running early", isOn: $settings.values.watchEarly)
+        Toggle("A detour or other alert", isOn: $settings.values.watchAlerts)
+      }
+    } header: {
+      Text("Notifications")
+    } footer: {
+      Text("Headway looks at your routes whenever its live data updates while it is open, and now and then in the background when iOS allows it. There is no server behind this, so a notification can come late, or not at all, if iOS does not wake the app. Late means more than 5 minutes behind the timetable, early more than 2 minutes ahead.")
     }
   }
 
@@ -160,6 +196,31 @@ struct SettingsView: View {
     let components = DateComponents(year: date.value / 10_000, month: date.value / 100 % 100, day: date.value % 100)
     guard let value = Calendar(identifier: .gregorian).date(from: components) else { return "\(date.value)" }
     return value.formatted(date: .abbreviated, time: .omitted)
+  }
+}
+
+/// The routes the rider wants to hear about.
+struct WatchedRoutesView: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    List {
+      Section {
+        ForEach(model.orderedRoutes) { route in
+          Toggle(isOn: Binding(get: { model.isWatching(route: route.id) }, set: { on in Task { await model.setWatching(route: route.id, on) } })) {
+            HStack(spacing: 12) {
+              RouteBadge(routeID: route.id)
+              Text(route.longName).font(.subheadline).lineLimit(1)
+            }
+          }
+        }
+      } footer: {
+        Text("You are told when one of these routes is late or early, or when the city posts a detour or alert for it.")
+      }
+    }
+    .navigationTitle("Routes to watch")
+    .navigationBarTitleDisplayMode(.inline)
+    .notificationsDeniedAlert()
   }
 }
 

@@ -64,6 +64,9 @@ final class AppModel {
   let settings: AppSettings
   let location = LocationController()
   let plan = PlanModel()
+  @ObservationIgnored let watch = WatchNotifier()
+  /// Set when the rider asked to watch a route but notifications are not allowed for the app.
+  var notificationsDenied = false
 
   private(set) var phase: Phase = .loading
   private(set) var schedule: Schedule?
@@ -120,6 +123,7 @@ final class AppModel {
   @ObservationIgnored private var started = false
   @ObservationIgnored private var isActive = true
   @ObservationIgnored private var lastAlertFetch = Date.distantPast
+  @ObservationIgnored private var lastTripsFetch = Date.distantPast
   @ObservationIgnored private var feedTimestamp: Date?
   @ObservationIgnored private var feedPeriod: TimeInterval = 30
   @ObservationIgnored private var periods: [TimeInterval] = []
@@ -635,7 +639,10 @@ final class AppModel {
         } else {
           delay = unchanged < 8 ? 2 : 10  // the feed is late or stopped: do not hammer the server
         }
-        if isNew { await refreshSlowData() }
+        if isNew {
+          await refreshSlowData()
+          await evaluateWatch()
+        }
       } catch is CancellationError {
         return
       } catch {
@@ -655,9 +662,59 @@ final class AppModel {
       lastAlertFetch = Date()
       if let snapshot = try? await client.fetch(.alerts) { alerts = snapshot.alerts }
     }
-    if sheet?.isDetail == true || mode != .map {
-      if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }
+    // Watching a route needs the predictions too, but a minute old is old enough.
+    let watching = settings.values.watchEnabled && !settings.values.watchedRoutes.isEmpty && Date().timeIntervalSince(lastTripsFetch) > 60
+    if sheet?.isDetail == true || mode != .map || watching {
+      if let snapshot = try? await client.fetch(.trips) {
+        predictions = snapshot.predictions
+        lastTripsFetch = Date()
+      }
     }
+  }
+
+  // MARK: Watched routes
+
+  /// Turns watching of a route on or off; the first time, asks for permission to send notifications.
+  func setWatching(route id: String, _ on: Bool) async {
+    if on {
+      if !settings.values.watchEnabled {
+        guard await WatchNotifier.authorize() else {
+          notificationsDenied = true
+          return
+        }
+        settings.values.watchEnabled = true
+      }
+      if !settings.values.watchedRoutes.contains(id) { settings.values.watchedRoutes.append(id) }
+    } else {
+      settings.values.watchedRoutes.removeAll { $0 == id }
+    }
+  }
+
+  func isWatching(route id: String) -> Bool { settings.values.watchedRoutes.contains(id) }
+
+  /// Looks at the watched routes with what is known now and notifies about anything new.
+  func evaluateWatch() async {
+    let prefs = settings.values
+    guard prefs.watchEnabled, !prefs.watchedRoutes.isEmpty, let schedule else { return }
+    var kinds: Set<WatchKind> = []
+    if prefs.watchLate { kinds.insert(.late) }
+    if prefs.watchEarly { kinds.insert(.early) }
+    if prefs.watchAlerts { kinds.insert(.alert) }
+    let now = Date()
+    let status = ServiceStatusBuilder.build(schedule: schedule, predictions: predictions, vehicles: vehicles, now: now)
+    let events = WatchEvaluator.evaluate(status: status, alerts: alerts, now: now, routes: Set(prefs.watchedRoutes), kinds: kinds)
+    await watch.deliver(events, now: now) { [weak self] id in self?.route(id)?.shortName ?? id }
+  }
+
+  /// One check from the background: loads what is needed, looks, and goes back to sleep.
+  func runBackgroundWatch() async {
+    guard settings.values.watchEnabled, !settings.values.watchedRoutes.isEmpty else { return }
+    if schedule == nil, let url = startingZip() { try? await apply(try await Self.parse(url)) }
+    guard schedule != nil else { return }
+    if let snapshot = try? await client.fetch(.vehicles) { vehicles = snapshot.vehicles }
+    if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }
+    if let snapshot = try? await client.fetch(.alerts) { alerts = snapshot.alerts }
+    await evaluateWatch()
   }
 
   /// The feed's rebuild period, learned from the gaps between its timestamps (30 s until seen).

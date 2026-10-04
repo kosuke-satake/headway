@@ -2266,17 +2266,6 @@
         }
       }
     },
-    "The city's feed is rebuilt every 30 seconds and each bus reports every 30 seconds, so a position is about 25 seconds old when you see it. Automatic refresh asks right after each rebuild. Estimating moves each bus along its route at its last speed; a veiled bus has not reported for over a minute. Predicted arrival times are fetched only while a stop or bus is open.": {
-      "extractionState": "manual",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "市のフィードは30秒ごとに作り直され、各バスも30秒ごとに位置を報告するため、画面に出る位置は約25秒前のものです。「自動」は、作り直された直後に取得します。「推定」は、バスを最後の速度で経路に沿って動かします。薄く表示されたバスは1分以上報告がありません。到着予測は、バス停かバスを開いている間だけ取得します。"
-          }
-        }
-      }
-    },
     "%lld%% early": {
       "extractionState": "manual",
       "localizations": {
@@ -3570,6 +3559,215 @@
           "stringUnit": {
             "state": "translated",
             "value": "経路の詳細を表示"
+          }
+        }
+      }
+    },
+    "Tap a route, or one of its directions, to see only that and its stops. Use the switch to hide a route from the map. Swipe left on a route to be notified about it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "路線（または方向）をタップすると、その路線とバス停だけを表示します。スイッチで路線を地図から隠せます。路線を左にスワイプすると、その路線の通知を受け取れます。"
+          }
+        }
+      }
+    },
+    "Notify me about watched routes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "監視している路線を通知"
+          }
+        }
+      }
+    },
+    "Routes to watch": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "監視する路線"
+          }
+        }
+      }
+    },
+    "A bus is running late": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バスが遅れているとき"
+          }
+        }
+      }
+    },
+    "A bus is running early": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バスが早く走っているとき"
+          }
+        }
+      }
+    },
+    "A detour or other alert": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "迂回などの警報が出たとき"
+          }
+        }
+      }
+    },
+    "Notifications": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "Headway looks at your routes whenever its live data updates while it is open, and now and then in the background when iOS allows it. There is no server behind this, so a notification can come late, or not at all, if iOS does not wake the app. Late means more than 5 minutes behind the timetable, early more than 2 minutes ahead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Headway は、アプリを開いている間はライブデータが更新されるたびに、バックグラウンドでは iOS が許可したときに時々、選んだ路線を確認します。サーバーを使わないため、iOS がアプリを起動しない場合は通知が遅れたり届かなかったりします。「遅れ」は時刻表より5分超、「早い」は2分超です。"
+          }
+        }
+      }
+    },
+    "Notifications are turned off": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知がオフになっています"
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を開く"
+          }
+        }
+      }
+    },
+    "Allow notifications for Headway in the iPhone's Settings to get these messages.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知を受け取るには、iPhone の設定で Headway の通知を許可してください。"
+          }
+        }
+      }
+    },
+    "You are told when one of these routes is late or early, or when the city posts a detour or alert for it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これらの路線が遅れたり早く走ったとき、または市が迂回や警報を出したときにお知らせします。"
+          }
+        }
+      }
+    },
+    "Stop watching": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "監視をやめる"
+          }
+        }
+      }
+    },
+    "Watch": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "監視する"
+          }
+        }
+      }
+    },
+    "Route %@ is running late": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 路線が遅れています"
+          }
+        }
+      }
+    },
+    "Route %@ is running early": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 路線が早く走っています"
+          }
+        }
+      }
+    },
+    "Up to %lld min behind the timetable · %lld buses": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻表より最大 %1$lld分遅れ · %2$lld台"
+          }
+        }
+      }
+    },
+    "Up to %lld min ahead of the timetable · %lld buses. Be at your stop a little early.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻表より最大 %1$lld分早い · %2$lld台。バス停には少し早めに着いてください。"
+          }
+        }
+      }
+    },
+    "The city's feed is rebuilt every 30 seconds and each bus reports every 30 seconds, so a position is about 25 seconds old when you see it. Automatic refresh asks right after each rebuild. Estimating moves each bus along its route at its last speed; a veiled bus has not reported for over a minute. Predicted arrival times are fetched only while a stop or bus is open, the service board or planner is showing, or you are watching routes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "市のフィードは30秒ごとに作り直され、各バスも30秒ごとに位置を報告するため、画面に出る位置は約25秒前のものです。「自動」は、作り直された直後に取得します。「推定」は、バスを最後の速度で経路に沿って動かします。薄く表示されたバスは1分以上報告がありません。到着予測は、バス停かバスを開いている間、運行情報や乗換案内を表示している間、路線を監視している間だけ取得します。"
           }
         }
       }

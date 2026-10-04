@@ -18,11 +18,12 @@ struct RoutesSheet: View {
         } header: {
           Text("All routes")
         } footer: {
-          Text("Tap a route, or one of its directions, to see only that and its stops. Use the switch to hide a route from the map.")
+          Text("Tap a route, or one of its directions, to see only that and its stops. Use the switch to hide a route from the map. Swipe left on a route to be notified about it.")
         }
       }
       .navigationTitle("Routes")
       .navigationBarTitleDisplayMode(.inline)
+      .notificationsDeniedAlert()
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
           Menu {
@@ -49,7 +50,10 @@ struct RoutesSheet: View {
           HStack(spacing: 12) {
             RouteBadge(routeID: route.id)
             VStack(alignment: .leading, spacing: 2) {
-              Text(route.longName.isEmpty ? String(localized: "Both directions") : route.longName).font(.subheadline).lineLimit(2)
+              HStack(spacing: 6) {
+                Text(route.longName.isEmpty ? String(localized: "Both directions") : route.longName).font(.subheadline).lineLimit(2)
+                if model.isWatching(route: route.id) { Image(systemName: "bell.fill").font(.caption2).foregroundStyle(.orange) }
+              }
               if let match = model.reliability(route: route.id, stop: nil) {
                 Text("Usually \(Int((match.cell.onTimeShare * 100).rounded()))% on time right now").font(.caption).foregroundStyle(.secondary)
               }
@@ -84,6 +88,14 @@ struct RoutesSheet: View {
       Toggle("Show \(route.shortName) on the map", isOn: Binding(
         get: { !hidden }, set: { model.settings.setRoute(route.id, hidden: !$0) }))
         .labelsHidden()
+    }
+    .swipeActions(edge: .trailing) {
+      Button {
+        Task { await model.setWatching(route: route.id, !model.isWatching(route: route.id)) }
+      } label: {
+        model.isWatching(route: route.id) ? Label("Stop watching", systemImage: "bell.slash") : Label("Watch", systemImage: "bell")
+      }
+      .tint(.blue)
     }
     .swipeActions(edge: .leading) {
       Button {

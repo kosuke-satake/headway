@@ -84,7 +84,10 @@ struct RootView: View {
       Button("Cancel", role: .cancel) {}
     }
     .preferredColorScheme(colorScheme)
-    .onChange(of: scenePhase) { _, phase in model.setActive(phase == .active) }
+    .onChange(of: scenePhase) { _, phase in
+      model.setActive(phase == .active)
+      if phase == .background { WatchBackground.schedule(enabled: model.settings.values.watchEnabled && !model.settings.values.watchedRoutes.isEmpty) }
+    }
   }
 
   private var colorScheme: ColorScheme? {

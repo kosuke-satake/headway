@@ -103,6 +103,13 @@ struct Preferences: Codable, Equatable {
   var favoriteRoutes: [String] = []
   var recentStops: [String] = []
 
+  // Notifications about watched routes
+  var watchEnabled = false
+  var watchedRoutes: [String] = []
+  var watchLate = true
+  var watchEarly = true
+  var watchAlerts = true
+
   // Last map position
   var lastLatitude: Double?
   var lastLongitude: Double?
@@ -146,6 +153,11 @@ struct Preferences: Codable, Equatable {
     favoriteStops = value(.favoriteStops, d.favoriteStops)
     favoriteRoutes = value(.favoriteRoutes, d.favoriteRoutes)
     recentStops = value(.recentStops, d.recentStops)
+    watchEnabled = value(.watchEnabled, d.watchEnabled)
+    watchedRoutes = value(.watchedRoutes, d.watchedRoutes)
+    watchLate = value(.watchLate, d.watchLate)
+    watchEarly = value(.watchEarly, d.watchEarly)
+    watchAlerts = value(.watchAlerts, d.watchAlerts)
     lastLatitude = try? c.decodeIfPresent(Double.self, forKey: .lastLatitude)
     lastLongitude = try? c.decodeIfPresent(Double.self, forKey: .lastLongitude)
     lastZoom = try? c.decodeIfPresent(Double.self, forKey: .lastZoom)
@@ -159,6 +171,7 @@ struct Preferences: Codable, Equatable {
     case walkSpeed, maxWalkMeters, maxTransfers, transferSeconds, accessibleOnly, journeySort, reminderLeadMinutes
     case savedPlaces, savedTrips, recentTrips
     case hiddenRoutes, favoriteStops, favoriteRoutes, recentStops
+    case watchEnabled, watchedRoutes, watchLate, watchEarly, watchAlerts
     case lastLatitude, lastLongitude, lastZoom
   }
 }

@@ -53,6 +53,10 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocationWhenInUseUsageDescription: Headway shows where you are on the map and finds nearby stops.
+        UIBackgroundModes:
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - dev.kosuke.headway.watch
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.kosuke.headway

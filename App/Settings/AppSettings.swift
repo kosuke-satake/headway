@@ -34,6 +34,7 @@ final class AppSettings {
     fresh.savedPlaces = values.savedPlaces
     fresh.savedTrips = values.savedTrips
     fresh.recentTrips = values.recentTrips
+    fresh.watchedRoutes = values.watchedRoutes
     values = fresh
   }
 

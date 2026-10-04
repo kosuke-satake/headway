@@ -3,10 +3,13 @@ import UserNotifications
 
 @main
 struct HeadwayApp: App {
-  @State private var model = AppModel(settings: AppSettings())
+  @State private var model: AppModel
 
   init() {
+    let model = AppModel(settings: AppSettings())
+    _model = State(initialValue: model)
     UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+    WatchBackground.register(model)
   }
 
   var body: some Scene {
