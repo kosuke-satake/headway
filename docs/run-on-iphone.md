@@ -16,13 +16,11 @@ allow-list (like an API key restricted to certain origins: which app id, which d
 - A free Apple ID is enough for your own iPhone. Limits: the app stops launching after 7 days until you install it
   again, at most 3 such apps at a time, and no remote push notifications (local notifications are fine).
 
-State of this Mac (checked 2026-10-03, after a first mistaken check that filtered out untrusted identities): the login
-keychain has an Apple Development certificate, and Xcode is signed in with a free Personal Team. The team id is in
+What to check on your Mac: the login keychain should have an Apple Development certificate, and Xcode is signed in with a free Personal Team. The team id is in
 `Config/Local.xcconfig`, which is not committed (the file is listed in `.gitignore`).
 
-The Mac apps in `~/Developer/Projects/Software/mac-utilities` use a different certificate on purpose: one shared
-self-signed "Mac Utilities Code Signing" certificate, so that macOS keeps privacy permissions across rebuilds (see that
-folder's `AGENTS.md`). iOS does not accept self-signed certificates, so Headway uses the Apple Development one.
+macOS apps can be signed with a self-signed certificate (which keeps privacy permissions across rebuilds), but iOS does
+not accept self-signed certificates, so Headway uses the Apple Development certificate.
 
 TestFlight is Apple's beta-testing service: you upload a build to App Store Connect, testers install it through the
 TestFlight app from an invitation or a public link, and each build expires after 90 days. It needs the paid Developer
