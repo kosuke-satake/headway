@@ -18,24 +18,38 @@ xcodegen generate >/dev/null
 
 DEVICE="${1:-}"
 if [ -z "$DEVICE" ]; then
-  # The first physical (not simulated) device that is reachable.
+  # A real device is any device that is not a simulator (simulators say "simulated"; real ones leave it empty).
   LIST="$(mktemp)"
   xcrun devicectl list devices --json-output "$LIST" >/dev/null 2>&1 || true
-  DEVICE=$(python3 - "$LIST" <<'PY'
+  FOUND=$(python3 - "$LIST" <<'PY'
 import json, sys
 try:
     devices = json.load(open(sys.argv[1]))["result"]["devices"]
 except Exception:
     devices = []
-for d in devices:
-    if d["hardwareProperties"].get("reality") == "physical" and d["connectionProperties"].get("tunnelState") != "unavailable":
-        print(d["hardwareProperties"]["udid"])
-        break
+real = [d for d in devices if d["hardwareProperties"].get("reality") != "simulated"]
+# Prefer a device that is connected right now over one that is only paired.
+real.sort(key=lambda d: d["connectionProperties"].get("tunnelState") != "connected")
+for d in real[:1]:
+    print(d["hardwareProperties"]["udid"], d["deviceProperties"].get("name", "iPhone"), d["connectionProperties"].get("tunnelState", ""), sep="|")
 PY
 )
   rm -f "$LIST"
+  if [ -z "$FOUND" ]; then
+    echo "This Mac has not paired with any iPhone. Connect it with a cable, unlock it, and tap Trust."
+    exit 1
+  fi
+  DEVICE="${FOUND%%|*}"
+  NAME=$(echo "$FOUND" | cut -d'|' -f2)
+  STATE="${FOUND##*|}"
+  if [ "$STATE" != "connected" ]; then
+    echo "$NAME is paired but not connected right now (state: ${STATE:-unknown})."
+    echo "Plug it in with the cable (or turn on Wi-Fi sync in Finder), unlock it, and run this again."
+    [ "${CHECK_ONLY:-}" = "1" ] || exit 1
+  fi
+  echo "Found $NAME"
 fi
-[ -n "$DEVICE" ] || { echo "No iPhone found. Connect it with a cable, unlock it, and tap Trust."; exit 1; }
+[ "${CHECK_ONLY:-}" = "1" ] && exit 0
 echo "Device: $DEVICE"
 
 xcodebuild -project Headway.xcodeproj -scheme Headway -configuration Debug \
