@@ -24,4 +24,6 @@ for font in "Noto Sans Regular" "Noto Sans Medium" "Noto Sans Italic"; do
     [ -f "$target" ] || curl -sfL "${ASSETS}/${font// /%20}/$range.pbf" -o "$target"
   done
 done
+# The fonts are under the SIL Open Font License, whose text must travel with them.
+[ -f App/Resources/glyphs/OFL.txt ] || curl -sfL "${ASSETS}/OFL.txt" -o App/Resources/glyphs/OFL.txt
 echo "basemap ready"
