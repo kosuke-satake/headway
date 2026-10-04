@@ -36,6 +36,16 @@ The author's general workspace rules (outside this repository) apply too; this f
     every route from it at once while the timetable parses behind it (Debug builds parse in about 3.5 s, Release in about
     0.35 s on a Mac), so the map is never blank. `MapState.overlay` is what is drawn; `schedule` is only used to move buses
     between reports.
+  - Lanes: `Sources/HeadwayCore/RouteBundling.swift` (`RouteBundler`) puts routes that share a street side by side. Shapes
+    are subdivided to 20 m; a cell of 3e-4 degrees holds the routes that pass along the same line (passes within 30
+    degrees of parallel); each gets a lane centred on the street; the sign follows a global "right of bearing 156"
+    convention so that both directions of a route land in one lane. The result is cut into runs of one lane and drawn
+    with a data-driven `line-offset` (`lane` times a step that grows with zoom; the product must sit inside the zoom curve's
+    stops or MapLibre raises an exception). Lanes are only used when nothing is in focus. Raise
+    `MapOverlayData.currentVersion` whenever this changes, or the old saved copy is used.
+  - `Sources/HeadwayCore/ServiceOutlook.swift` (today's first/last trip and the next trip of a route and direction),
+    `App/Support/RouteStatusText.swift` (the wording), `Planning/MultiStop.swift` (a trip through up to three stops with
+    stay times; each part is planned from the end of the previous one plus the stay, and backwards for "arrive by").
   - Focus: `App/Map/MapFocus.swift`. A focus limits the map to a route (one direction or both), an alert's routes with its
     stops ringed (`StopCodes.find` reads "Stop 7253" out of the alert text, because alerts carry no stop ids) or the late
     and early buses of the delay rows. `Preferences.focusStyle` hides the rest or fades it. Arrows (`route-arrows`,
@@ -122,9 +132,9 @@ The author's general workspace rules (outside this repository) apply too; this f
 - Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
 - App: `xcodegen generate`, then
   `xcodebuild -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO`.
-- Tests: `swift test` (data layer, 101),
+- Tests: `swift test` (data layer, 120),
   `xcodebuild test -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO`
-  (app, 36; use the simulator's UDID when two are booted) and `cd collector && npm test` (9; runs the Worker in
+  (app, 42; use the simulator's UDID when two are booted) and `cd collector && npm test` (9; runs the Worker in
   Cloudflare's runtime locally).
 - Strings: `tools/add_strings.py` adds or updates Japanese translations in the catalog from JSON on stdin.
 - iPhone: `tools/run_on_device.sh` builds a Release build (the timetable loads about ten times faster than in Debug).

@@ -19,7 +19,7 @@ time, and the next arrivals at any stop. English UI with a Japanese localization
   long-press on the map, to anywhere. It finds journeys with walking and transfers, takes the live delay of reporting
   buses into account, shows them step by step and draws them on the map. Leave now, depart at, or **arrive by**; earlier
   and later buses; sort by departure, arrival, transfers or walking; badges for the fastest, fewest-transfer and
-  least-walking journeys. **Saved places** (Home, Work, others), **saved trips** (one tap to plan again), recent trips,
+  least-walking journeys. Up to three **stops on the way**, each with a stay time. **Saved places** (Home, Work, others), **saved trips** (one tap to plan again), recent trips,
   walking speed, longest walk, most transfers, time to change buses, wheelchair-accessible only, a reminder before you
   have to leave, and sharing a journey as text.
 - **How punctual, and how live.** The live line reports the age of the bus positions (they are about 25 s old; the city's
@@ -30,6 +30,9 @@ time, and the next arrivals at any stop. English UI with a Japanese localization
 - **Directions.** Many Madison streets are one-way, so the two directions of a route often differ. Routes are listed by
   direction ("Westbound to ..."), the favourite-stop cards say where their buses go, and arrows along a route show which
   way its buses run.
+- **Overlapping routes.** Routes that share a street are drawn side by side in lanes, like a transit diagram; tapping
+  lines of several routes asks which one you meant. Each route and direction says how many buses are running, or why
+  there are none (not running today, between trips), with the next trip.
 - **Focus.** Tap a route, or one direction of it, to see only that on the map (other routes are hidden or faded, as you
   choose in Settings); an alert's **Show on map** link does the same and rings the stops its text names; the delay rows
   of Service info show the late or early buses on the map. Hide routes you never use.
@@ -78,8 +81,8 @@ installs it). A free Apple ID works; the app must be re-signed every 7 days.
 ## Quality checks
 
 ```bash
-swift test                                                       # data layer (101 tests)
+swift test                                                       # data layer (120 tests)
 xcodebuild test -project Headway.xcodeproj -scheme Headway \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO   # app tests (36)
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO   # app tests (42)
 (cd collector && npm test)                                       # collector, in Cloudflare's runtime (9 tests)
 ```
