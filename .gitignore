@@ -22,6 +22,9 @@ build/
 
 # Node tooling
 node_modules/
+collector/dist/
+collector/.wrangler/
+collector/.dev.vars
 
 # Machine-specific build settings
 Config/Local.xcconfig

@@ -1,0 +1,12 @@
+name = "headway-collector"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# Runs every minute; each run looks at the vehicle feed three times (the city rebuilds it every 30 seconds).
+[triggers]
+crons = ["* * * * *"]
+
+# The database is created on the first deploy (see collector/README.md).
+[[d1_databases]]
+binding = "DB"
+database_name = "headway-collector"

@@ -555,16 +555,30 @@ final class AppModel {
     return result
   }
 
-  /// Fetches the timetable at most once a day (or when `force` is set). A new feed replaces the loaded one only if its
-  /// version differs; a failed attempt (offline) changes nothing.
+  /// Fetches the timetable at most once a day (or when `force` is set). The server is asked first whether the file has
+  /// changed (it sends an ETag), so a day without a new timetable costs a few hundred bytes instead of 7 MB. A new feed
+  /// replaces the loaded one only if its version differs; a failed attempt (offline) changes nothing.
   private func refreshFromNetwork(force: Bool) async -> RefreshResult {
     guard let cache = Self.cacheURL else { return .failed }
     let modified = (try? cache.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
     if !force, Date().timeIntervalSince(modified) < 86_400 { return .upToDate }
+    var request = URLRequest(url: Self.scheduleURL)
+    request.cachePolicy = .reloadIgnoringLocalCacheData
+    let defaults = UserDefaults.standard
+    if FileManager.default.fileExists(atPath: cache.path) {
+      if let etag = defaults.string(forKey: Self.etagKey) { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+      if let date = defaults.string(forKey: Self.lastModifiedKey) { request.setValue(date, forHTTPHeaderField: "If-Modified-Since") }
+    }
     do {
-      let (temporary, response) = try await URLSession.shared.download(from: Self.scheduleURL)
-      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return .failed }
+      let (temporary, response) = try await URLSession.shared.download(for: request)
+      guard let http = response as? HTTPURLResponse else { return .failed }
+      if http.statusCode == 304 {
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cache.path)
+        return .upToDate
+      }
+      guard http.statusCode == 200 else { return .failed }
       let fresh = try await Self.parse(temporary)
+      remember(http, in: defaults)
       if fresh.schedule.feedVersion == schedule?.feedVersion {
         try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cache.path)
         return .upToDate
@@ -578,14 +592,24 @@ final class AppModel {
     }
   }
 
+  private static let etagKey = "timetable.etag"
+  private static let lastModifiedKey = "timetable.lastModified"
+
+  /// Keeps what the server said about the file we have, for the next conditional request.
+  private func remember(_ response: HTTPURLResponse, in defaults: UserDefaults) {
+    defaults.set(response.value(forHTTPHeaderField: "ETag"), forKey: Self.etagKey)
+    defaults.set(response.value(forHTTPHeaderField: "Last-Modified"), forKey: Self.lastModifiedKey)
+  }
+
   /// Used only when there is no local copy at all.
   private func downloadZip(replacingCache: Bool) async -> Bool {
     guard let cache = Self.cacheURL else { return false }
     do {
       let (temporary, response) = try await URLSession.shared.download(from: Self.scheduleURL)
-      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return false }
+      guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return false }
       try? FileManager.default.removeItem(at: cache)
       try FileManager.default.moveItem(at: temporary, to: cache)
+      remember(http, in: .standard)
       return true
     } catch {
       return false

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build Headway and install it on a connected iPhone.
+# Build Headway (an optimised Release build: the timetable loads several times faster than in a Debug build) and
+# install it on a connected iPhone.
 #
 #   tools/run_on_device.sh              # picks the connected iPhone (asks if there are several)
 #   tools/run_on_device.sh <device id>
@@ -56,14 +57,14 @@ echo "Device: $DEVICE"
 
 LOG="build/device-build.log"
 mkdir -p build
-if ! xcodebuild -project Headway.xcodeproj -scheme Headway -configuration Debug \
+if ! xcodebuild -project Headway.xcodeproj -scheme Headway -configuration Release \
   -destination "id=$DEVICE" -derivedDataPath build/Device -allowProvisioningUpdates build > "$LOG" 2>&1; then
   echo "Build failed. Errors:"
   grep -E "error:" "$LOG" | sort -u | head -n 10
   echo "(full log: $LOG; the first build after adding an Apple ID sometimes fails while Xcode creates the signing profile, so try once more)"
   exit 1
 fi
-APP="build/Device/Build/Products/Debug-iphoneos/Headway.app"
+APP="build/Device/Build/Products/Release-iphoneos/Headway.app"
 xcrun devicectl device install app --device "$DEVICE" "$APP"
 if ! xcrun devicectl device process launch --device "$DEVICE" dev.kosuke.headway; then
   echo
