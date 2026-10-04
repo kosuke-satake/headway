@@ -93,6 +93,29 @@ period (whole days; the text has the real hours). They name routes, not stops, e
 closed. There is no geometry. Moving buses were within a few metres of their route line on almost every route, including
 routes with alerts (the detours are limited in time), so a detour path cannot yet be recovered from positions.
 
+## Directions and destinations (checked 2026-10-04 in feed S072_202608240858)
+
+Each trip has a `direction_id` (0 or 1), a `trip_direction_name` ("Westbound", ...) and a headsign that begins with a
+pattern number ("2-Airport"); the number is part of what the bus displays. A route can show several headsigns in one
+direction. Route D, for example:
+
+| direction | headsign | trips | runs on |
+|---|---|---:|---|
+| 0 | 1-JUNCTION | 279 | every day |
+| 0 | 2-EPIC CAMPUS | 149 | Monday to Friday only |
+| 0 | 2-VERONA | 130 | every day |
+| 0 | 2-WILLIAMSBURG | 7 | weekends |
+| 0 | 1-GAMMON, 2-MCKEE | 5 each | weekdays |
+| 1 | 2-AIRPORT | 286 | every day |
+| 1 | 1-SPRECHER | 275 | every day |
+| 1 | INGERSOLL, 1-DEMPSEY | 12, 4 | some days |
+
+So a D bus can say "2-Epic Campus" on a weekday while the app, on a weekend, lists only "2-Verona" for the same stop;
+both are in the timetable. Whether the city changed D recently cannot be told from one feed version. The recordings so far
+cover a weekend, so the weekday patterns could not yet be checked against buses (`feedanalysis variants data/feeds <route>`
+compares the headsign of each bus's trip with the line it is on). Many Madison streets are one-way, so the two directions
+of a route often use different streets and stops.
+
 ## Open questions
 
 - Do the preliminary numbers above hold over a full day, and do they differ by hour and route?
