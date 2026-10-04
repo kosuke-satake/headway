@@ -16,18 +16,25 @@ allow-list (like an API key restricted to certain origins: which app id, which d
 - A free Apple ID is enough for your own iPhone. Limits: the app stops launching after 7 days until you install it
   again, at most 3 such apps at a time, and no remote push notifications (local notifications are fine).
 
-State of this Mac on 2026-10-03: no signing identities and no Xcode account yet, so the first step is adding the Apple ID.
+State of this Mac (checked 2026-10-03, after a first mistaken check that filtered out untrusted identities): the login
+keychain has an "Apple Development: kosuke.satake@icloud.com" certificate (valid to 2027-09-05), and Xcode is signed in
+with a free Personal Team, `ZVUC9RT3QV`. That team id is in `Config/Local.xcconfig`, which is not committed.
+
+The Mac apps in `~/Developer/Projects/Software/mac-utilities` use a different certificate on purpose: one shared
+self-signed "Mac Utilities Code Signing" certificate, so that macOS keeps privacy permissions across rebuilds (see that
+folder's `AGENTS.md`). iOS does not accept self-signed certificates, so Headway uses the Apple Development one.
+
+TestFlight is Apple's beta-testing service: you upload a build to App Store Connect, testers install it through the
+TestFlight app from an invitation or a public link, and each build expires after 90 days. It needs the paid Developer
+Program (USD 99 a year), so it is not used for now. The same applies to the App Store and to alternative marketplaces.
 
 ## Steps
 
-1. Xcode > Settings > Accounts > + > Apple ID. Sign in. A "Personal Team" appears.
+1. Already done on this Mac (Xcode > Settings > Accounts shows the Personal Team).
 2. iPhone: Settings > Privacy & Security > Developer Mode > on (the phone restarts). Connect it with a cable, unlock it
    and tap Trust.
-3. Find your Team ID (Accounts > select the team; or the 10-character id Xcode shows under Signing & Capabilities) and
-   put it where the project will keep it, so `xcodegen generate` does not lose it:
-   ```bash
-   cp Config/Local.xcconfig.example Config/Local.xcconfig   # then edit DEVELOPMENT_TEAM
-   ```
+3. The team id lives in `Config/Local.xcconfig` (copy `Config/Local.xcconfig.example` on another machine) so that
+   `xcodegen generate` does not lose it.
 4. Build and install, either in Xcode (`xcodegen generate && open Headway.xcodeproj`, choose the iPhone, Run) or from
    the terminal:
    ```bash

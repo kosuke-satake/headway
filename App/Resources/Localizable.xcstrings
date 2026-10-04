@@ -321,17 +321,6 @@
         }
       }
     },
-    "Update every": {
-      "extractionState": "manual",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新間隔"
-          }
-        }
-      }
-    },
     "Behavior": {
       "extractionState": "manual",
       "localizations": {
@@ -526,17 +515,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "データ"
-          }
-        }
-      }
-    },
-    "Each update is about 3 KB. Faster updates use more battery. Predicted arrival times are fetched only while a stop or bus is open.": {
-      "extractionState": "manual",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1回の更新は約3KBです。更新が速いほど電池を消費します。到着予測は、バス停かバスを開いている間だけ取得します。"
           }
         }
       }
@@ -838,17 +816,6 @@
         }
       }
     },
-    "%lld seconds": {
-      "extractionState": "manual",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld秒"
-          }
-        }
-      }
-    },
     "· %@": {
       "extractionState": "manual",
       "localizations": {
@@ -1109,28 +1076,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "接続中…"
-          }
-        }
-      }
-    },
-    "No live data · last update %lld s ago": {
-      "extractionState": "manual",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ライブデータなし · %lld秒前に更新"
-          }
-        }
-      }
-    },
-    "Live · %lld buses · %lld s ago": {
-      "extractionState": "manual",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ライブ · %lld台 · %lld秒前"
           }
         }
       }
@@ -2229,6 +2174,357 @@
           "stringUnit": {
             "state": "translated",
             "value": "路線に割り当てなし"
+          }
+        }
+      }
+    },
+    "No connection · positions %lld s old": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続なし · 位置は%lld秒前"
+          }
+        }
+      }
+    },
+    "Delayed · positions %lld s old": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新遅延 · 位置は%lld秒前"
+          }
+        }
+      }
+    },
+    "Live · %lld buses · positions %lld s old": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブ · %lld台 · 位置は約%lld秒前"
+          }
+        }
+      }
+    },
+    "Refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動"
+          }
+        }
+      }
+    },
+    "Every 30 seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30秒ごと"
+          }
+        }
+      }
+    },
+    "Every minute": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1分ごと"
+          }
+        }
+      }
+    },
+    "Estimate positions between reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報告の間は位置を推定"
+          }
+        }
+      }
+    },
+    "The city's feed is rebuilt every 30 seconds and each bus reports every 30 seconds, so a position is about 25 seconds old when you see it. Automatic refresh asks right after each rebuild. Estimating moves each bus along its route at its last speed; a veiled bus has not reported for over a minute. Predicted arrival times are fetched only while a stop or bus is open.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "市のフィードは30秒ごとに作り直され、各バスも30秒ごとに位置を報告するため、画面に出る位置は約25秒前のものです。「自動」は、作り直された直後に取得します。「推定」は、バスを最後の速度で経路に沿って動かします。薄く表示されたバスは1分以上報告がありません。到着予測は、バス停かバスを開いている間だけ取得します。"
+          }
+        }
+      }
+    },
+    "%lld%% early": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%% 早着"
+          }
+        }
+      }
+    },
+    "%lld%% on time": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%% 定時"
+          }
+        }
+      }
+    },
+    "%lld%% late": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%% 遅れ"
+          }
+        }
+      }
+    },
+    "Usually at this stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このバス停の普段の運行"
+          }
+        }
+      }
+    },
+    "Early means more than a minute before the timetable, late more than five minutes after. Ranges next to live times show where the bus turned up in 9 of 10 past cases for predictions this far ahead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早着は時刻表より1分以上早い場合、遅れは5分以上遅い場合です。ライブの時刻の横の範囲は、同じくらい先の予測のとき、過去10回中9回でバスが来た範囲です。"
+          }
+        }
+      }
+    },
+    "Not enough history for this time yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この時間帯の履歴はまだ足りません。"
+          }
+        }
+      }
+    },
+    "Weekdays": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平日"
+          }
+        }
+      }
+    },
+    "Saturdays": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "土曜"
+          }
+        }
+      }
+    },
+    "Sundays": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日曜"
+          }
+        }
+      }
+    },
+    "this stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このバス停"
+          }
+        }
+      }
+    },
+    "whole route": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "路線全体"
+          }
+        }
+      }
+    },
+    "Usually %lld%% on time right now": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この時間帯は普段 %lld%% が定時"
+          }
+        }
+      }
+    },
+    "usually %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "普段は %@"
+          }
+        }
+      }
+    },
+    "%lld–%lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld〜%lld分"
+          }
+        }
+      }
+    },
+    "%lld arrivals": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld arrival"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld arrivals"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld件の通過"
+          }
+        }
+      }
+    },
+    "%lld days recorded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld day recorded"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld days recorded"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録%lld日分"
+          }
+        }
+      }
+    },
+    "around %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@頃"
+          }
+        }
+      }
+    },
+    "Only %lld days have been recorded so far, so these numbers are rough. They improve as recordings accumulate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Only %lld day has been recorded so far, so these numbers are rough. They improve as recordings accumulate."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Only %lld days have been recorded so far, so these numbers are rough. They improve as recordings accumulate."
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これまでに記録できたのは%lld日分だけなので、数字はまだ粗いです。記録が増えるほど精度が上がります。"
           }
         }
       }

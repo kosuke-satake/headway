@@ -11,7 +11,7 @@ struct MapPreferences: Equatable {
   var stopVisibility: StopVisibility = .zoomed
   var showStopNames = true
   var smoothBusMovement = true
-  var updateInterval = 10
+  var estimateBusPositions = true
   var hiddenRoutes: Set<String> = []
   var favoriteStops: [String] = []
 
@@ -25,7 +25,7 @@ struct MapPreferences: Equatable {
     stopVisibility = p.stopVisibility
     showStopNames = p.showStopNames
     smoothBusMovement = p.smoothBusMovement
-    updateInterval = p.updateInterval
+    estimateBusPositions = p.estimateBusPositions
     hiddenRoutes = p.hiddenRoutes
     favoriteStops = p.favoriteStops
   }

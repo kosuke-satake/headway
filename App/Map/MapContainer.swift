@@ -165,10 +165,10 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
       if old.vehicles != new.vehicles || old.prefs.hiddenRoutes != new.prefs.hiddenRoutes
         || old.selectedVehicle != new.selectedVehicle || old.offRouteVehicles != new.offRouteVehicles
       {
-        if old.vehicles != new.vehicles {
+        if old.vehicles != new.vehicles || old.prefs.estimateBusPositions != new.prefs.estimateBusPositions {
           animator.update(
-            vehicles: new.vehicles, smooth: new.prefs.smoothBusMovement, duration: Double(new.prefs.updateInterval),
-            now: CACurrentMediaTime())
+            vehicles: new.vehicles, schedule: new.schedule, estimate: new.prefs.estimateBusPositions,
+            smooth: new.prefs.smoothBusMovement, now: CACurrentMediaTime(), wall: Date())
         }
         flushBuses()
         startAnimationIfNeeded()
@@ -196,7 +196,8 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     built.setStops(state)
     built.setSelectedStop(state)
     animator.update(
-      vehicles: state.vehicles, smooth: false, duration: 1, now: CACurrentMediaTime())
+      vehicles: state.vehicles, schedule: state.schedule, estimate: state.prefs.estimateBusPositions, smooth: false,
+      now: CACurrentMediaTime(), wall: Date())
     flushBuses()
   }
 
@@ -208,10 +209,11 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
   // MARK: Smooth movement
 
   private func startAnimationIfNeeded() {
-    guard state.prefs.smoothBusMovement else { return }
+    guard state.prefs.smoothBusMovement || state.prefs.estimateBusPositions else { return }
     if displayLink == nil {
       let link = CADisplayLink(target: self, selector: #selector(tick))
-      link.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
+      // Buses move slowly on screen; 20 frames a second looks smooth and is gentler on the battery.
+      link.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 20, preferred: 20)
       link.add(to: .main, forMode: .common)
       displayLink = link
     }

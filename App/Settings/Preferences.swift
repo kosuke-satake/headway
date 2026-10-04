@@ -66,8 +66,11 @@ struct Preferences: Codable, Equatable {
   var showStopNames = true
 
   // Live data
-  var updateInterval: Int = 10  // seconds
+  /// 0 follows the city's feed (a new one every 30 s); 30 and 60 are battery-saving fixed intervals.
+  var updateInterval: Int = 0
   var smoothBusMovement = true
+  /// Move each bus along its route at its last speed between reports.
+  var estimateBusPositions = true
   var pauseLiveInBackground = true
 
   // Time
@@ -103,8 +106,10 @@ struct Preferences: Codable, Equatable {
     routeLineWidth = min(1.6, max(0.6, value(.routeLineWidth, d.routeLineWidth)))
     stopVisibility = value(.stopVisibility, d.stopVisibility)
     showStopNames = value(.showStopNames, d.showStopNames)
-    updateInterval = [5, 10, 15, 30].contains(value(.updateInterval, d.updateInterval)) ? value(.updateInterval, d.updateInterval) : 10
+    // Earlier versions stored 5, 10 or 15 seconds; those now mean "follow the feed".
+    updateInterval = [30, 60].contains(value(.updateInterval, d.updateInterval)) ? value(.updateInterval, d.updateInterval) : 0
     smoothBusMovement = value(.smoothBusMovement, d.smoothBusMovement)
+    estimateBusPositions = value(.estimateBusPositions, d.estimateBusPositions)
     pauseLiveInBackground = value(.pauseLiveInBackground, d.pauseLiveInBackground)
     clockFormat = value(.clockFormat, d.clockFormat)
     arrivalStyle = value(.arrivalStyle, d.arrivalStyle)
@@ -122,7 +127,7 @@ struct Preferences: Codable, Equatable {
 
   private enum Key: String, CodingKey {
     case appearance, routePalette, markerSize, showRouteNameOnBuses, routeLineWidth, stopVisibility, showStopNames
-    case updateInterval, smoothBusMovement, pauseLiveInBackground
+    case updateInterval, smoothBusMovement, estimateBusPositions, pauseLiveInBackground
     case clockFormat, arrivalStyle, showDelayDetails
     case hapticFeedback, rememberMapPosition
     case hiddenRoutes, favoriteStops, favoriteRoutes, recentStops

@@ -85,6 +85,9 @@ extension ServiceAlert {
 public struct RealtimeSnapshot: Sendable {
   /// The time the producer stamped on the whole feed.
   public let feedTimestamp: Date?
+  /// The server's clock when it answered (the HTTP `Date` header). Compared with `feedTimestamp` it says how old the
+  /// feed is, without trusting the phone's own clock. Set by `RealtimeClient`.
+  public internal(set) var serverDate: Date? = nil
   public let vehicles: [VehicleSample]
   public let predictions: [TripPrediction]
   public let alerts: [ServiceAlert]

@@ -48,6 +48,9 @@ struct RoutesSheet: View {
           VStack(alignment: .leading, spacing: 2) {
             Text((model.headsignsByRoute[route.id] ?? []).map(\.prettyHeadsign).joined(separator: " · "))
               .font(.subheadline).lineLimit(2)
+            if let match = model.reliability(route: route.id, stop: nil) {
+              Text("Usually \(Int((match.cell.onTimeShare * 100).rounded()))% on time right now").font(.caption).foregroundStyle(.secondary)
+            }
             if model.focusedRouteID == route.id { Text("Showing only this route").font(.caption).foregroundStyle(.blue) }
           }
           Spacer(minLength: 0)

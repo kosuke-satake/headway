@@ -6,6 +6,7 @@ import HeadwayCore
 //   feedanalysis sample   <recording-dir>
 //   feedanalysis report   <recording-dir>
 //   feedanalysis deviation <recording-dir>
+//   feedanalysis punctuality <recordings-root> <output.json> [observations.sqlite] [--force]
 
 func fail(_ message: String) -> Never {
   FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -17,6 +18,12 @@ guard arguments.count >= 3 else {
   fail("usage: feedanalysis schedule <zip> | sample <dir> | report <dir>")
 }
 let directory = URL(fileURLWithPath: arguments[2])
+
+/// The timetable to compare recordings with: the newest one under the recordings root.
+func scheduleZip(_ directory: URL) -> URL {
+  guard let zip = Recordings.latestSchedule(in: directory) else { fail("no mmt_gtfs.zip under \(directory.path)") }
+  return zip
+}
 
 switch arguments[1] {
 case "schedule":
@@ -68,14 +75,35 @@ case "shape":
     for q in started.prefix(2) { print("   ", q.routeID, q.stops.prefix(3).map { "\($0.stopID) seq \($0.sequence ?? -1) arr \($0.arrival.map { "\($0)" } ?? "-") dly \($0.arrivalDelay.map(String.init) ?? "-")" }) }
   }
 
+case "punctuality":
+  // feedanalysis punctuality <recordings-root> <output.json> [observations.sqlite]
+  guard arguments.count >= 4 else { fail("usage: feedanalysis punctuality <recordings-root> <output.json> [observations.sqlite]") }
+  let schedule = try Schedule.load(zipAt: scheduleZip(directory))
+  let output = URL(fileURLWithPath: arguments[3])
+  let dbPath = arguments.count >= 5 ? arguments[4] : output.deletingLastPathComponent().appendingPathComponent("observations.sqlite").path
+  let store = try ObservationStore(path: dbPath)
+  let builder = PunctualityBuilder(schedule: schedule, recordings: try Recordings(directory: directory), store: store)
+  try builder.ingest(force: arguments.contains("--force"))
+  let table = try builder.export(to: output)
+  print("wrote \(output.path): \(table.observations) observations over \(table.days) day(s) \(table.firstDay)...\(table.lastDay); \(table.routeCells.count) route cells, \(table.stopCells.count) stop cells")
+
+case "accuracy":
+  // feedanalysis accuracy <recordings-root> [observations.sqlite]
+  let schedule = try Schedule.load(zipAt: scheduleZip(directory))
+  let dbPath = arguments.count >= 4 ? arguments[3] : directory.deletingLastPathComponent().appendingPathComponent("punctuality/observations.sqlite").path
+  print(try Accuracy(schedule: schedule, recordings: try Recordings(directory: directory), store: try ObservationStore(path: dbPath)).markdown())
+
+case "freshness":
+  print(try Freshness(recordings: try Recordings(directory: directory)).markdown())
+
 case "deviation":
-  let schedule = try Schedule.load(zipAt: directory.appendingPathComponent("mmt_gtfs.zip"))
+  let schedule = try Schedule.load(zipAt: scheduleZip(directory))
   print(try Deviation(schedule: schedule, recordings: try Recordings(directory: directory)).markdown())
 
 case "plan":
   // feedanalysis plan <recording-dir> <from stop code or name> <to stop code or name> [HH:mm]
   guard arguments.count >= 5 else { fail("usage: feedanalysis plan <dir> <from> <to> [HH:mm]") }
-  let schedule = try Schedule.load(zipAt: directory.appendingPathComponent("mmt_gtfs.zip"))
+  let schedule = try Schedule.load(zipAt: scheduleZip(directory))
   func find(_ query: String) -> Stop {
     let matches = schedule.stops.values.filter { $0.code == query || $0.name.localizedCaseInsensitiveContains(query) }
       .sorted { ($0.name, $0.code) < ($1.name, $1.code) }
@@ -124,7 +152,7 @@ case "plan":
 
 case "report":
   // `feedanalysis report <recording-dir>`; the schedule is read from <recording-dir>/mmt_gtfs.zip.
-  let zip = directory.appendingPathComponent("mmt_gtfs.zip")
+  let zip = scheduleZip(directory)
   let schedule = try Schedule.load(zipAt: zip)
   let report = Report(schedule: schedule, recordings: try Recordings(directory: directory))
   print(report.markdown(try report.run()))

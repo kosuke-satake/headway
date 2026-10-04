@@ -73,7 +73,10 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Findings that shape the design are in `docs/data-sources.md`: predictions carry no delay, so delay is computed
   against the timetable; positions can be stale by more than a minute.
 - Constraint: free stack only; no paid services. A free personal Apple ID is enough for installing on the user's own
-  iPhone (re-signing every 7 days); the paid Developer Program is only needed to distribute.
+  iPhone (re-signing every 7 days); the paid Developer Program is only needed to distribute (TestFlight, App Store).
+- Signing: the Mac utilities use one shared self-signed certificate (see `mac-utilities/AGENTS.md`); iOS rejects
+  self-signed certificates, so Headway uses the Apple Development certificate of the Personal Team `ZVUC9RT3QV`, kept
+  in the uncommitted `Config/Local.xcconfig`. `docs/run-on-iphone.md` has the steps and the TestFlight note.
 
 ## Plan
 

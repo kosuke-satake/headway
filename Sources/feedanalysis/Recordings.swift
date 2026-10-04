@@ -11,11 +11,30 @@ struct RecordedFile {
 struct Recordings {
   private let all: [RecordedFile]
 
+  /// Day folders (`yyyy-MM-dd`) found under a recordings root, oldest first. A day folder passed directly counts as one.
+  static func dayFolders(in directory: URL) -> [URL] {
+    let entries = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+    let days = entries.filter { $0.lastPathComponent.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil }
+    return days.isEmpty ? [directory] : days.sorted { $0.lastPathComponent < $1.lastPathComponent }
+  }
+
+  /// The newest timetable zip under `directory` (a root or a day folder).
+  static func latestSchedule(in directory: URL) -> URL? {
+    for folder in dayFolders(in: directory).reversed() {
+      let zip = folder.appendingPathComponent("mmt_gtfs.zip")
+      if FileManager.default.fileExists(atPath: zip.path) { return zip }
+    }
+    return nil
+  }
+
   init(directory: URL) throws {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyyMMdd'T'HHmmssZ"
-    let names = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+    var names: [URL] = []
+    for folder in Self.dayFolders(in: directory) {
+      names += try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+    }
     var files: [RecordedFile] = []
     for url in names where url.lastPathComponent.hasSuffix(".pb.gz") {
       let parts = url.lastPathComponent.dropLast(".pb.gz".count).split(separator: "_")

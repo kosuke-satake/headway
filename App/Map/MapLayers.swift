@@ -29,6 +29,7 @@ final class MapLayers {
   private let stopNames: MLNSymbolStyleLayer
   private let selectedBusLayer: MLNCircleStyleLayer
   private let offRouteLayer: MLNCircleStyleLayer
+  private let staleLayer: MLNCircleStyleLayer
   private let journeySource: MLNShapeSource
   private let journeyPointSource: MLNShapeSource
   private var journeyCasing: MLNLineStyleLayer?
@@ -139,6 +140,10 @@ final class MapLayers {
       busLabels[id] = label
       style.addLayer(label)
     }
+    // A veil over buses whose last report is old: they may not be where they are drawn.
+    staleLayer = MLNCircleStyleLayer(identifier: "bus-stale", source: busSource)
+    staleLayer.predicate = NSPredicate(format: "stale == %@", NSNumber(value: true))
+    style.addLayer(staleLayer)
   }
 
   private static func insertBelowLabels(_ layer: MLNStyleLayer, in style: MLNStyle) {
@@ -232,6 +237,8 @@ final class MapLayers {
     stopNames.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: 0.9)))
     stopNames.maximumTextWidth = NSExpression(forConstantValue: 8)
 
+    staleLayer.circleColor = NSExpression(forConstantValue: theme.stopFill.withAlphaComponent(0.6))
+    staleLayer.circleRadius = NSExpression(forConstantValue: prefs.markerSize.radius + 2.5)
     offRouteLayer.circleColor = NSExpression(forConstantValue: UIColor.clear)
     offRouteLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.systemOrange)
     offRouteLayer.circleStrokeWidth = NSExpression(forConstantValue: 3)
@@ -324,19 +331,24 @@ final class MapLayers {
     }
   }
 
+  /// Reports older than this are shown veiled.
+  static let staleAfter: TimeInterval = 75
+
   /// Draws buses at the given (possibly in-between) coordinates.
-  func setBuses(_ buses: [(vehicle: VehicleSample, coordinate: CLLocationCoordinate2D)], state: MapState) {
+  func setBuses(_ buses: [DrawnBus], state: MapState) {
     let hidden = state.prefs.hiddenRoutes
     var features: [MLNPointFeature] = []
     var selected: MLNPointFeature?
-    for (vehicle, coordinate) in buses where !hidden.contains(vehicle.routeID) {
+    for bus in buses where !hidden.contains(bus.vehicle.routeID) {
+      let vehicle = bus.vehicle
       let point = MLNPointFeature()
-      point.coordinate = coordinate
+      point.coordinate = bus.coordinate
       point.attributes = [
         "id": vehicle.id,
         "route": vehicle.routeID,
         "label": state.schedule?.routes[vehicle.routeID]?.shortName ?? vehicle.routeID,
         "off": state.offRouteVehicles.contains(vehicle.id),
+        "stale": bus.age > Self.staleAfter,
       ]
       features.append(point)
       if vehicle.id == state.selectedVehicle { selected = point }

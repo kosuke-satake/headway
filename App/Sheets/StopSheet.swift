@@ -103,6 +103,7 @@ struct StopSheet: View {
         }
         .listRowInsets(EdgeInsets())
       }
+      reliabilitySection
       if model.hiddenArrivalCount > 0 || model.showHiddenRoutes, !model.hiddenRoutes.isEmpty {
         Toggle(isOn: Bindable(model).showHiddenRoutes) {
           Text("Show hidden routes").font(.footnote)
@@ -114,6 +115,32 @@ struct StopSheet: View {
       }
     }
     .listStyle(.plain)
+  }
+}
+
+extension StopSheet {
+  /// How early, on time and late each route has been here at this time of day.
+  @ViewBuilder fileprivate var reliabilitySection: some View {
+    let routes = model.visibleRoutes(atStop: stopID)
+    let matches = routes.compactMap { route in model.reliability(route: route, stop: stopID).map { (route, $0) } }
+    if !matches.isEmpty {
+      Section {
+        ForEach(matches, id: \.0) { route, match in ReliabilityRow(routeID: route, match: match) }
+      } header: {
+        Text("Usually at this stop")
+      } footer: {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Early means more than a minute before the timetable, late more than five minutes after. Ranges next to live times show where the bus turned up in 9 of 10 past cases for predictions this far ahead.")
+          if model.punctuality.days < 7 {
+            Text("Only \(model.punctuality.days) days have been recorded so far, so these numbers are rough. They improve as recordings accumulate.")
+              .foregroundStyle(.orange)
+          }
+        }
+        .font(.footnote)
+      }
+    } else if model.punctuality.days > 0, !routes.isEmpty {
+      Text("Not enough history for this time yet.").font(.footnote).foregroundStyle(.secondary).listRowSeparator(.hidden)
+    }
   }
 }
 
@@ -137,7 +164,14 @@ struct ArrivalRow: View {
         VStack(alignment: .trailing, spacing: 1) {
           Text(text.arrival(arrival, now: now))
             .font(.title3.weight(arrival.status == .live ? .semibold : .regular)).monospacedDigit()
-          if model.settings.values.arrivalStyle == .countdown, arrival.minutes(from: now) < 60 {
+          if let window = model.window(for: arrival, now: now),
+            let range = model.settings.values.arrivalStyle == .countdown && arrival.minutes(from: now) < 60
+              ? TimeText.minuteRange(earliest: window.earliest, latest: window.latest, now: now)
+              : text.clockRange(earliest: window.earliest, latest: window.latest)
+          {
+            // Where the bus has turned up in 9 of 10 past cases for a prediction this far ahead.
+            Text(range).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+          } else if model.settings.values.arrivalStyle == .countdown, arrival.minutes(from: now) < 60 {
             Text(text.clock(arrival.expected)).font(.caption).foregroundStyle(.secondary).monospacedDigit()
           }
         }

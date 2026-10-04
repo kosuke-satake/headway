@@ -22,14 +22,27 @@ public struct RealtimeClient: Sendable {
     self.session = session
   }
 
+  static func parseHTTPDate(_ text: String?) -> Date? {
+    guard let text else { return nil }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: "GMT")
+    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+    return formatter.date(from: text)
+  }
+
   public func fetch(_ feed: RealtimeFeed) async throws -> RealtimeSnapshot {
     var request = URLRequest(url: baseURL.appendingPathComponent(feed.rawValue))
     request.timeoutInterval = 10
     request.cachePolicy = .reloadIgnoringLocalCacheData
     let (data, response) = try await session.data(for: request)
-    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-      throw RealtimeError.badStatus(http.statusCode)
+    var serverDate: Date?
+    if let http = response as? HTTPURLResponse {
+      if !(200..<300).contains(http.statusCode) { throw RealtimeError.badStatus(http.statusCode) }
+      serverDate = Self.parseHTTPDate(http.value(forHTTPHeaderField: "Date"))
     }
-    return try RealtimeDecoder.decode(data)
+    var snapshot = try RealtimeDecoder.decode(data)
+    snapshot.serverDate = serverDate
+    return snapshot
   }
 }

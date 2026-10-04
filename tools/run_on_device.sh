@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.."
 [ -f Config/Local.xcconfig ] || { echo "Missing Config/Local.xcconfig (see Config/Local.xcconfig.example)"; exit 1; }
 [ -f data/maps/madison.pmtiles ] || tools/fetch_basemap.sh
 [ -f data/seed/mmt_gtfs.zip ] || tools/fetch_timetable.sh
+[ -f data/punctuality/punctuality.json ] || tools/build_punctuality.sh
 xcodegen generate >/dev/null
 
 DEVICE="${1:-}"

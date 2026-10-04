@@ -104,3 +104,19 @@ extension TimeText {
   /// "230 m" below a kilometre, otherwise "1.4 km" (or the locale's units).
   static func walking(_ meters: Double) -> String { distance(meters) }
 }
+
+extension TimeText {
+  /// "3–6 min" for a bus expected between `earliest` and `latest`, or `nil` when the range is no wider than a minute
+  /// (a range that narrow adds nothing to the single number).
+  static func minuteRange(earliest: Date, latest: Date, now: Date) -> String? {
+    let low = max(0, Int((earliest.timeIntervalSince(now) / 60).rounded(.down)))
+    let high = max(0, Int((latest.timeIntervalSince(now) / 60).rounded(.up)))
+    guard high - low >= 2 else { return nil }
+    return String(localized: "\(low)–\(high) min")
+  }
+
+  func clockRange(earliest: Date, latest: Date) -> String? {
+    let a = clock(earliest), b = clock(latest)
+    return a == b ? nil : "\(a)–\(b)"
+  }
+}

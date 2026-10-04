@@ -34,6 +34,9 @@ targets:
       # Offline basemap, fetched by tools/fetch_basemap.sh (not committed).
       - path: data/maps/madison.pmtiles
         buildPhase: resources
+      # Punctuality statistics, built by tools/build_punctuality.sh from the recordings (not committed).
+      - path: data/punctuality/punctuality.json
+        buildPhase: resources
       # Timetable seed for the first launch, fetched by tools/fetch_timetable.sh (not committed).
       - path: data/seed/mmt_gtfs.zip
         buildPhase: resources

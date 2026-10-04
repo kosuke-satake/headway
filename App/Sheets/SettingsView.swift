@@ -52,15 +52,18 @@ struct SettingsView: View {
         }
 
         Section {
-          Picker("Update every", selection: $settings.values.updateInterval) {
-            ForEach([5, 10, 15, 30], id: \.self) { Text("\($0) seconds").tag($0) }
+          Picker("Refresh", selection: $settings.values.updateInterval) {
+            Text("Automatic").tag(0)
+            Text("Every 30 seconds").tag(30)
+            Text("Every minute").tag(60)
           }
+          Toggle("Estimate positions between reports", isOn: $settings.values.estimateBusPositions)
           Toggle("Smooth bus movement", isOn: $settings.values.smoothBusMovement)
           Toggle("Pause in the background", isOn: $settings.values.pauseLiveInBackground)
         } header: {
           Text("Live buses")
         } footer: {
-          Text("Each update is about 3 KB. Faster updates use more battery. Predicted arrival times are fetched only while a stop or bus is open.")
+          Text("The city's feed is rebuilt every 30 seconds and each bus reports every 30 seconds, so a position is about 25 seconds old when you see it. Automatic refresh asks right after each rebuild. Estimating moves each bus along its route at its last speed; a veiled bus has not reported for over a minute. Predicted arrival times are fetched only while a stop or bus is open.")
         }
 
         Section("Times") {

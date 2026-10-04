@@ -37,4 +37,38 @@ import Testing
     let single = [Coordinate(latitude: 43, longitude: -89)]
     #expect(Geometry.distance(from: Coordinate(latitude: 43, longitude: -89), toLine: single) < 0.001)
   }
+
+  @Test func pathAheadFollowsTheLine() throws {
+    // A line east along latitude 43, then north.
+    let line = [
+      Coordinate(latitude: 43.000, longitude: -89.400), Coordinate(latitude: 43.000, longitude: -89.390),
+      Coordinate(latitude: 43.010, longitude: -89.390),
+    ]
+    let start = Coordinate(latitude: 43.0, longitude: -89.399)
+    // 1,000 m ahead covers the rest of the first segment (about 0.9 km) and turns the corner.
+    let path = try #require(Geometry.pathAhead(on: line, from: start, meters: 1_000))
+    #expect(path.first!.longitude > -89.3995 && path.first!.longitude < -89.3985)
+    #expect(path.contains(line[1]))
+    let end = path.last!
+    #expect(end.latitude > 43.0 && abs(end.longitude + 89.390) < 1e-6)
+    var length = 0.0
+    for (next, previous) in zip(path.dropFirst(), path) { length += Geometry.distance(from: previous, to: next) }
+    #expect(abs(length - 1_000) < 5)
+    // The point 500 m along is still on the first segment.
+    let half = Geometry.point(on: path, at: 500)
+    #expect(abs(half.latitude - 43.0) < 1e-6)
+  }
+
+  @Test func pathAheadClampsAtTheEndOfTheLine() throws {
+    let line = [Coordinate(latitude: 43, longitude: -89.40), Coordinate(latitude: 43, longitude: -89.39)]
+    let path = try #require(Geometry.pathAhead(on: line, from: line[0], meters: 50_000))
+    #expect(path.last == line[1])
+    #expect(Geometry.point(on: path, at: 1e9) == line[1])
+  }
+
+  @Test func pathAheadNeedsADirectionAndALine() {
+    let line = [Coordinate(latitude: 43, longitude: -89.40), Coordinate(latitude: 43, longitude: -89.39)]
+    #expect(Geometry.pathAhead(on: line, from: line[0], meters: 0) == nil)
+    #expect(Geometry.pathAhead(on: [line[0]], from: line[0], meters: 100) == nil)
+  }
 }

@@ -12,7 +12,8 @@ import Testing
     let prefs = try decode(#"{"routePalette":"distinct","markerSize":"large"}"#)
     #expect(prefs.routePalette == .distinct)
     #expect(prefs.markerSize == .large)
-    #expect(prefs.updateInterval == 10)
+    #expect(prefs.updateInterval == 0)  // automatic
+    #expect(prefs.estimateBusPositions)
     #expect(prefs.showRouteNameOnBuses)
     #expect(prefs.favoriteStops.isEmpty)
   }
@@ -20,8 +21,15 @@ import Testing
   @Test func unknownValuesFallBackInsteadOfFailing() throws {
     let prefs = try decode(#"{"appearance":"sepia","updateInterval":7,"stopVisibility":42}"#)
     #expect(prefs.appearance == .system)
-    #expect(prefs.updateInterval == 10)
+    #expect(prefs.updateInterval == 0)
     #expect(prefs.stopVisibility == .zoomed)
+  }
+
+  @Test func oldFixedIntervalsMeanAutomatic() throws {
+    // Versions before 0.2 stored 5, 10 or 15 seconds.
+    #expect(try decode(#"{"updateInterval":10}"#).updateInterval == 0)
+    #expect(try decode(#"{"updateInterval":30}"#).updateInterval == 30)
+    #expect(try decode(#"{"updateInterval":60}"#).updateInterval == 60)
   }
 
   @Test func lineWidthIsClamped() throws {

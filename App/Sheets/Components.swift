@@ -82,3 +82,72 @@ struct CircleButton: View {
     .accessibilityLabel(label)
   }
 }
+
+/// Early, on time and late as one bar: blue for buses that left before the timetable, green for on time, orange for late.
+struct ReliabilityBar: View {
+  let cell: PunctualityCell
+
+  var body: some View {
+    GeometryReader { geometry in
+      let total = max(1, cell.n)
+      HStack(spacing: 2) {
+        segment(cell.early, total: total, width: geometry.size.width, color: .blue)
+        segment(cell.onTime, total: total, width: geometry.size.width, color: .green)
+        segment(cell.late, total: total, width: geometry.size.width, color: .orange)
+      }
+    }
+    .frame(height: 8)
+    .clipShape(Capsule())
+    .accessibilityHidden(true)
+  }
+
+  @ViewBuilder private func segment(_ count: Int, total: Int, width: CGFloat, color: Color) -> some View {
+    if count > 0 {
+      color.frame(width: max(3, width * CGFloat(count) / CGFloat(total)))
+    }
+  }
+}
+
+/// How punctual a route has been at this time of day, with the bar and the numbers.
+struct ReliabilityRow: View {
+  @Environment(AppModel.self) private var model
+  let routeID: String
+  let match: PunctualityTable.Match
+
+  var body: some View {
+    let cell = match.cell
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 10) {
+        RouteBadge(routeID: routeID, compact: true)
+        ReliabilityBar(cell: cell)
+      }
+      HStack(spacing: 10) {
+        Text("\(percent(cell.earlyShare))% early").foregroundStyle(.blue)
+        Text("\(percent(cell.onTimeShare))% on time").foregroundStyle(.green)
+        Text("\(percent(cell.lateShare))% late").foregroundStyle(.orange)
+      }
+      .font(.caption.weight(.medium))
+      Text(description).font(.caption2).foregroundStyle(.secondary)
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func percent(_ share: Double) -> Int { Int((share * 100).rounded()) }
+
+  private var description: String {
+    let name: String
+    switch match.dayType {
+    case .weekday: name = String(localized: "Weekdays")
+    case .saturday: name = String(localized: "Saturdays")
+    case .sunday: name = String(localized: "Sundays")
+    }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = model.schedule?.timeZone ?? .current
+    let time = calendar.date(bySettingHour: match.hour, minute: 0, second: 0, of: Date()) ?? Date()
+    let hour = model.timeText().hourLabel(time)
+    let scope = match.scope == .stop ? String(localized: "this stop") : String(localized: "whole route")
+    let arrivals = String(localized: "\(match.cell.n) arrivals")
+    let days = String(localized: "\(model.punctuality.days) days recorded")
+    return "\(name) \(String(localized: "around \(hour)")) · \(scope) · \(arrivals) · \(days)"
+  }
+}

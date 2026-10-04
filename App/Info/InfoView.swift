@@ -261,9 +261,14 @@ private struct RouteStatusRow: View {
         }
       }
       Spacer(minLength: 8)
-      if let average = status.averageDelay {
-        let label = TimeText.delay(Int(average.rounded())) ?? ""
-        Text(label).font(.subheadline.weight(.semibold)).foregroundStyle(color(average)).monospacedDigit()
+      VStack(alignment: .trailing, spacing: 1) {
+        if let average = status.averageDelay {
+          let label = TimeText.delay(Int(average.rounded())) ?? ""
+          Text(label).font(.subheadline.weight(.semibold)).foregroundStyle(color(average)).monospacedDigit()
+        }
+        if let usual = model.reliability(route: status.routeID, stop: nil), let label = TimeText.delay(usual.cell.p50) {
+          Text("usually \(label)").font(.caption2).foregroundStyle(.secondary)
+        }
       }
     }
     .accessibilityElement(children: .combine)

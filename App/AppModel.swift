@@ -70,6 +70,8 @@ final class AppModel {
   private(set) var vehicles: [VehicleSample] = []
   private(set) var predictions: [TripPrediction] = []
   private(set) var alerts: [ServiceAlert] = []
+  /// How punctual routes and stops have been, and how far live predictions have been off (from recordings).
+  private(set) var punctuality: PunctualityTable = .empty
   /// Buses that are far from the line their trip should follow, so probably on a detour.
   private(set) var offRouteVehicleIDs: Set<String> = []
   /// When on, the stop sheet and timetable also show routes the user chose to hide.
@@ -118,6 +120,9 @@ final class AppModel {
   @ObservationIgnored private var isActive = true
   @ObservationIgnored private var focusFromBus = false
   @ObservationIgnored private var lastAlertFetch = Date.distantPast
+  @ObservationIgnored private var feedTimestamp: Date?
+  @ObservationIgnored private var feedPeriod: TimeInterval = 30
+  @ObservationIgnored private var periods: [TimeInterval] = []
 
   static let scheduleURL = URL(string: "https://transitdata.cityofmadison.com/GTFS/mmt_gtfs.zip")!
 
@@ -190,6 +195,7 @@ final class AppModel {
     guard !started else { return }
     started = true
     restartPolling()
+    Task { await loadPunctuality() }
     await loadSchedule()
   }
 
@@ -231,6 +237,30 @@ final class AppModel {
         focusFromBus = true
       }
     }
+  }
+
+  // MARK: Punctuality
+
+  private func loadPunctuality() async {
+    guard let url = Bundle.main.url(forResource: "punctuality", withExtension: "json") else { return }
+    let table = await Task.detached(priority: .utility) { () -> PunctualityTable? in
+      guard let data = try? Data(contentsOf: url) else { return nil }
+      return try? PunctualityTable.decode(data)
+    }.value
+    if let table { punctuality = table }
+  }
+
+  /// Past punctuality of `route` (at `stop`, if given) at this time of day and week, when there is enough history.
+  func reliability(route: String, stop: String?, at date: Date = Date()) -> PunctualityTable.Match? {
+    punctuality.match(route: route, stop: stop, at: date, in: schedule?.timeZone ?? TimeZone(identifier: "America/Chicago")!)
+  }
+
+  /// When a live bus has come in 9 of 10 past cases for a prediction this far ahead.
+  func window(for arrival: Arrival, now: Date = Date()) -> (earliest: Date, latest: Date)? {
+    guard arrival.status == .live,
+      let offsets = punctuality.window(predictedIn: arrival.expected.timeIntervalSince(now))
+    else { return nil }
+    return (max(now, arrival.expected.addingTimeInterval(offsets.earliest)), arrival.expected.addingTimeInterval(offsets.latest))
   }
 
   // MARK: Journeys
@@ -433,35 +463,81 @@ final class AppModel {
     pollTask = Task { [weak self] in await self?.pollLoop() }
   }
 
+  /// The city rebuilds its feed on a fixed beat (30 s, measured) and each bus reports on the same beat, so asking more
+  /// often only returns the same data. After a new feed is seen, the next request waits until just before the next
+  /// beat; if the feed has not changed yet, it tries again every 2 seconds. This gives the freshest positions with
+  /// about a third of the requests of a fixed 10-second poll. Only local time is used, so a wrong clock on the phone
+  /// cannot throw the timing off.
   private func pollLoop() async {
+    var unchanged = 0
+    var lastChange = Date.distantPast
     while !Task.isCancelled {
+      var delay = 10.0
       do {
         let snapshot = try await client.fetch(.vehicles)
-        vehicles = snapshot.vehicles
-        offRouteVehicleIDs = computeOffRoute(snapshot.vehicles)
+        let isNew = vehicles.isEmpty || snapshot.feedTimestamp == nil || snapshot.feedTimestamp != feedTimestamp
+        if isNew {
+          if let old = feedTimestamp, let new = snapshot.feedTimestamp, new > old { notePeriod(new.timeIntervalSince(old)) }
+          feedTimestamp = snapshot.feedTimestamp
+          vehicles = snapshot.vehicles
+          offRouteVehicleIDs = computeOffRoute(snapshot.vehicles)
+          unchanged = 0
+          lastChange = Date()
+        } else {
+          unchanged += 1
+        }
         lastLiveUpdate = Date()
         liveFailing = false
+        let fixed = settings.values.updateInterval
+        if fixed > 0 {
+          delay = Double(fixed)
+        } else if isNew, let stamp = snapshot.feedTimestamp, let serverNow = snapshot.serverDate {
+          // The next feed is stamped one period after this one. The server's own clock says how far off that is, so the
+          // phone's clock does not matter. A second and a half leaves time for the server to publish it.
+          delay = min(45, max(2, stamp.addingTimeInterval(feedPeriod + 1.5).timeIntervalSince(serverNow)))
+        } else if isNew {
+          delay = max(2, lastChange.addingTimeInterval(feedPeriod - 1).timeIntervalSinceNow)
+        } else {
+          delay = unchanged < 8 ? 2 : 10  // the feed is late or stopped: do not hammer the server
+        }
+        if isNew { await refreshSlowData() }
       } catch is CancellationError {
         return
       } catch {
         if Task.isCancelled { return }  // a restart cancels the request; that is not a failure
         liveFailing = true
       }
-      if Date().timeIntervalSince(lastAlertFetch) > 60 {
-        // Service alerts change rarely and are tiny (about 3 KB).
-        lastAlertFetch = Date()
-        if let snapshot = try? await client.fetch(.alerts) { alerts = snapshot.alerts }
-      }
-      if sheet?.isDetail == true || mode != .map {
-        // Trip predictions are about 250 KB, so they are only fetched while a stop, a bus, the service board or the
-        // planner needs them.
-        if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }
-      }
       refreshArrivals()
       refreshStatus()
-      let interval = max(5, settings.values.updateInterval)
-      try? await Task.sleep(for: .seconds(interval))
+      try? await Task.sleep(for: .seconds(delay))
     }
+  }
+
+  /// Alerts (about 3 KB, change rarely) and trip predictions (about 250 KB, only needed while a stop, a bus, the service
+  /// board or the planner is open) ride along with a new vehicle feed.
+  private func refreshSlowData() async {
+    if Date().timeIntervalSince(lastAlertFetch) > 60 {
+      lastAlertFetch = Date()
+      if let snapshot = try? await client.fetch(.alerts) { alerts = snapshot.alerts }
+    }
+    if sheet?.isDetail == true || mode != .map {
+      if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }
+    }
+  }
+
+  /// The feed's rebuild period, learned from the gaps between its timestamps (30 s until seen).
+  private func notePeriod(_ seconds: TimeInterval) {
+    guard seconds > 5, seconds < 120 else { return }
+    periods.append(seconds)
+    if periods.count > 9 { periods.removeFirst() }
+    feedPeriod = periods.sorted()[periods.count / 2]
+  }
+
+  /// Median age of the bus positions on screen, in seconds: how far behind the real buses the map is.
+  func positionAge(at now: Date) -> TimeInterval? {
+    let ages = vehicles.compactMap { $0.timestamp.map { now.timeIntervalSince($0) } }.sorted()
+    guard !ages.isEmpty else { return nil }
+    return max(0, ages[ages.count / 2])
   }
 
   /// Recomputes the service board when it is on screen.

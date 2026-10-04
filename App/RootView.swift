@@ -109,20 +109,22 @@ private struct Controls: View {
       CircleButton(systemName: model.location.isAuthorized ? "location.fill" : "location", label: "My location") {
         model.locateMe()
       }
-      CircleButton(systemName: "gearshape", label: "Settings") { model.sheet = .settings }
     }
   }
 }
 
-/// One line that says whether the buses on the map are live.
+/// One line that says how current the buses on the map are. "Live" is only true to a point: positions are about
+/// half a minute old when they arrive, so the line reports their age, not the time of the last request.
 private struct StatusPill: View {
   @Environment(AppModel.self) private var model
 
   var body: some View {
     TimelineView(.periodic(from: .now, by: 1)) { context in
+      let age = model.positionAge(at: context.date)
+      let late = model.liveFailing || (age ?? 0) > 90
       HStack(spacing: 8) {
-        Circle().fill(color(at: context.date)).frame(width: 8, height: 8)
-        Text(text(at: context.date)).font(.footnote.weight(.medium)).monospacedDigit()
+        Circle().fill(model.lastLiveUpdate == nil ? Color.gray : (late ? Color.orange : Color.green)).frame(width: 8, height: 8)
+        Text(text(age: age, late: late)).font(.footnote.weight(.medium)).monospacedDigit()
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 7)
@@ -131,22 +133,14 @@ private struct StatusPill: View {
     }
   }
 
-  private func age(at now: Date) -> TimeInterval? { model.lastLiveUpdate.map { now.timeIntervalSince($0) } }
-
-  private func color(at now: Date) -> Color {
-    guard let age = age(at: now) else { return .gray }
-    let limit = Double(max(30, model.settings.values.updateInterval * 3))
-    return model.liveFailing || age > limit ? .orange : .green
-  }
-
-  private func text(at now: Date) -> String {
-    guard let age = age(at: now) else { return String(localized: "Connecting…") }
-    let seconds = Int(age)
-    let limit = max(30, model.settings.values.updateInterval * 3)
-    if model.liveFailing || seconds > limit {
-      return String(localized: "No live data · last update \(seconds) s ago")
+  private func text(age: TimeInterval?, late: Bool) -> String {
+    guard let age else { return String(localized: "Connecting…") }
+    let seconds = Int(age.rounded())
+    if model.liveFailing {
+      return String(localized: "No connection · positions \(seconds) s old")
     }
-    return String(localized: "Live · \(model.vehicles.count) buses · \(seconds) s ago")
+    if late { return String(localized: "Delayed · positions \(seconds) s old") }
+    return String(localized: "Live · \(model.vehicles.count) buses · positions \(seconds) s old")
   }
 }
 
