@@ -115,6 +115,47 @@ private func makePlannerFeed(stopAccess: [String: Int] = [:], tripAccess: [Strin
   }
 }
 
+@Suite struct PlannerStopAccessTests {
+  private func monday(_ schedule: Schedule, _ h: Int, _ m: Int) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = schedule.timeZone
+    return calendar.date(from: DateComponents(year: 2026, month: 10, day: 5, hour: h, minute: m))!
+  }
+
+  private func point(_ schedule: Schedule, _ id: String) -> PlanPoint {
+    let stop = schedule.stops[id]!
+    return PlanPoint(name: stop.name, coordinate: Coordinate(latitude: stop.latitude, longitude: stop.longitude), stopID: id)
+  }
+
+  @Test func aChosenStopCanBeLeftForTheOneAcrossTheStreet() throws {
+    // C2 (only route 4, to E) is 100 m from C (route 2, to D). Starting at C2 and going to D works by walking to C.
+    let schedule = try makePlannerFeed()
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "C2"), to: point(schedule, "D"), departAt: monday(schedule, 8, 0))
+    let best = try #require(journeys.first)
+    #expect(best.rides.map(\.routeID) == ["R2"])
+    #expect(best.walkingMeters > 50 && best.walkingMeters < 200)
+  }
+
+  @Test func theChosenStopIsStillPreferredWhenItWorks() throws {
+    let schedule = try makePlannerFeed()
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "C2"), to: point(schedule, "E"), departAt: monday(schedule, 8, 0))
+    let best = try #require(journeys.first)
+    #expect(best.rides.map(\.tripID) == ["r4a"])
+    #expect(best.walkingMeters == 0)
+  }
+
+  @Test func stopsBeyondTheAccessRadiusAreNotUsed() throws {
+    let schedule = try makePlannerFeed()
+    var options = PlanOptions()
+    options.stopAccessMeters = 50
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "C2"), to: point(schedule, "D"), departAt: monday(schedule, 8, 0), options: options)
+    #expect(journeys.isEmpty)
+  }
+}
+
 @Suite struct TripPlannerTests {
   let schedule: Schedule
   let planner: TripPlanner

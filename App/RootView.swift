@@ -6,11 +6,14 @@ struct RootView: View {
 
   /// Height of the stop and bus sheets in their resting position.
   private static let detailHeight: CGFloat = 320
+  /// The smallest position of the journey sheet: just its header, so the map is nearly free and the sheet is still
+  /// there to pull back up.
+  private static let peekHeight: CGFloat = 128
 
   var body: some View {
     @Bindable var model = model
     ZStack(alignment: .top) {
-      MapContainer(bottomInset: model.sheet?.isDetail == true ? Self.detailHeight : 0)
+      MapContainer(bottomInset: model.sheet?.isDetail == true ? (model.sheet == .journey ? Self.peekHeight : Self.detailHeight) : 0)
         .ignoresSafeArea()
         .accessibilityHidden(model.mode != .map)
       if model.mode == .map {
@@ -31,6 +34,14 @@ struct RootView: View {
           .frame(maxWidth: .infinity, alignment: .trailing)
           .padding(.top, 54)
           .padding(.trailing, 12)
+
+        // A journey stays on the map after its sheet is gone; this is the way back to it.
+        if model.mapJourney != nil, model.sheet == nil {
+          JourneyBar()
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+        }
       }
       if model.mode == .info {
         InfoView().background(Color(.systemGroupedBackground).ignoresSafeArea())
@@ -47,7 +58,7 @@ struct RootView: View {
       case .bus(let id):
         BusSheet(vehicleID: id).modifier(DetailSheetStyle(height: Self.detailHeight))
       case .journey:
-        JourneySheet().modifier(DetailSheetStyle(height: Self.detailHeight))
+        JourneySheet().modifier(DetailSheetStyle(height: Self.detailHeight, peek: Self.peekHeight))
       case .settings:
         // Half height with the map still usable, so a change (colours, marker size) can be watched on the map.
         SettingsView()
@@ -88,10 +99,13 @@ struct RootView: View {
 /// A bottom sheet that leaves the map usable above it.
 private struct DetailSheetStyle: ViewModifier {
   let height: CGFloat
+  /// When set, the sheet can be lowered to this height but not swiped away.
+  var peek: CGFloat?
 
   func body(content: Content) -> some View {
     content
-      .presentationDetents([.height(height), .large])
+      .presentationDetents(peek.map { [.height($0), .height(height), .large] } ?? [.height(height), .large])
+      .interactiveDismissDisabled(peek != nil)
       .presentationBackgroundInteraction(.enabled(upThrough: .height(height)))
       .presentationDragIndicator(.visible)
       .presentationContentInteraction(.scrolls)
@@ -145,6 +159,40 @@ private struct StatusPill: View {
 }
 
 /// Says what the map is limited to, and lets the rider change the direction or go back to all routes.
+/// The journey drawn on the map, as a bar at the bottom: tap it to bring the steps back, or close the journey.
+private struct JourneyBar: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    if let journey = model.mapJourney {
+      let text = model.timeText()
+      HStack(spacing: 12) {
+        Button { model.sheet = .journey } label: {
+          HStack(spacing: 10) {
+            Image(systemName: "arrow.triangle.turn.up.right.diamond.fill").foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 1) {
+              Text("\(text.clock(journey.departure)) → \(text.clock(journey.arrival))").font(.subheadline.weight(.semibold)).monospacedDigit()
+              Text("Show journey steps").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.up").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        Button { model.clearJourney() } label: {
+          Image(systemName: "xmark.circle.fill").font(.title3).symbolRenderingMode(.hierarchical).foregroundStyle(.secondary).frame(width: 36, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Close"))
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 4)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+  }
+}
+
 private struct FocusChip: View {
   @Environment(AppModel.self) private var model
 

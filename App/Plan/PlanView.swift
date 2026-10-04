@@ -16,6 +16,7 @@ struct PlanView: View {
   @Environment(AppModel.self) private var model
   @State private var picking: PickTarget?
   @State private var showOptions = false
+  @State private var showSavedPlaces = false
   @State private var mode: DepartMode = .now
   @State private var date = Date().addingTimeInterval(900)
 
@@ -47,6 +48,12 @@ struct PlanView: View {
         }
       }
       .sheet(isPresented: $showOptions) { PlanOptionsView() }
+      .sheet(isPresented: $showSavedPlaces) {
+        NavigationStack {
+          SavedPlacesView()
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Done") { showSavedPlaces = false } } }
+        }
+      }
     }
     .task {
       // Arriving with both places filled in (from "Directions") plans straight away.
@@ -94,6 +101,7 @@ struct PlanView: View {
               .buttonStyle(.plain)
               .contextMenu {
                 Button("Directions from here", systemImage: "figure.walk.departure") { setStart(place.point) }
+                Button("Edit", systemImage: "pencil") { showSavedPlaces = true }
                 Button("Remove", systemImage: "trash", role: .destructive) { model.settings.removePlace(place.id) }
               }
           }
@@ -104,6 +112,12 @@ struct PlanView: View {
       }
       .listRowInsets(EdgeInsets())
       .listRowBackground(Color.clear)
+    } header: {
+      HStack {
+        Text("Saved places")
+        Spacer()
+        Button("Edit") { showSavedPlaces = true }.textCase(nil)
+      }
     }
   }
 
@@ -114,6 +128,7 @@ struct PlanView: View {
         .contextMenu {
           Button("Directions from here", systemImage: "figure.walk.departure") { setStart(place.point) }
           Button("Change", systemImage: "pencil") { picking = pick }
+          Button("Edit", systemImage: "slider.horizontal.3") { showSavedPlaces = true }
           Button("Remove", systemImage: "trash", role: .destructive) { model.settings.removePlace(place.id) }
         }
     } else {
@@ -704,10 +719,17 @@ struct SavedPlacesView: View {
           Text("Long-press a place in the trip planner, or a search result, to save it as Home, Work or a favourite place.")
             .font(.footnote).foregroundStyle(.secondary)
         }
-        ForEach($settings.values.savedPlaces) { $place in
-          HStack(spacing: 12) {
-            Image(systemName: place.kind.symbol).foregroundStyle(Color.accentColor).frame(width: 24)
-            TextField("Name", text: $place.name)
+        ForEach(settings.values.savedPlaces) { place in
+          NavigationLink {
+            SavedPlaceEditor(placeID: place.id)
+          } label: {
+            HStack(spacing: 12) {
+              Image(systemName: place.kind.symbol).foregroundStyle(Color.accentColor).frame(width: 24)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(place.name)
+                if place.stopID != nil { Text("Bus stop").font(.caption).foregroundStyle(.secondary) }
+              }
+            }
           }
         }
         .onDelete { settings.values.savedPlaces.remove(atOffsets: $0) }
@@ -727,5 +749,56 @@ struct SavedPlacesView: View {
     }
     .navigationTitle("Saved places")
     .toolbar { EditButton() }
+  }
+}
+
+/// Change a saved place: its name, what it is, and where it is.
+struct SavedPlaceEditor: View {
+  @Environment(AppModel.self) private var model
+  @Environment(\.dismiss) private var dismiss
+  let placeID: String
+  @State private var choosingLocation = false
+
+  var body: some View {
+    if let place = model.settings.values.savedPlaces.first(where: { $0.id == placeID }) {
+      Form {
+        Section {
+          TextField("Name", text: Binding(get: { place.name }, set: { model.settings.update(place: placeID, name: $0) }))
+          Picker("Kind", selection: Binding(get: { place.kind }, set: { model.settings.update(place: placeID, kind: $0) })) {
+            Label("Home", systemImage: PlaceKind.home.symbol).tag(PlaceKind.home)
+            Label("Work", systemImage: PlaceKind.work.symbol).tag(PlaceKind.work)
+            Label("Place", systemImage: PlaceKind.other.symbol).tag(PlaceKind.other)
+          }
+        } footer: {
+          Text("There is one Home and one Work. Choosing one that is already taken turns the other into an ordinary place.")
+        }
+        Section {
+          Button { choosingLocation = true } label: {
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Change location")
+              Text(place.stopID == nil ? String(localized: "A point on the map") : String(localized: "A bus stop"))
+                .font(.caption).foregroundStyle(.secondary)
+            }
+          }
+        } footer: {
+          Text("A saved bus stop also lets the planner use the stops next to it, such as the one across the street.")
+        }
+        Section {
+          Button("Delete place", role: .destructive) {
+            model.settings.removePlace(placeID)
+            dismiss()
+          }
+        }
+      }
+      .navigationTitle(place.name)
+      .navigationBarTitleDisplayMode(.inline)
+      .sheet(isPresented: $choosingLocation) {
+        PlacePicker(allowsMyLocation: false, title: "Location") { choice in
+          if case .point(let point) = choice { model.settings.update(place: placeID, point: point) }
+        }
+      }
+    } else {
+      ContentUnavailableView("Place not found", systemImage: "mappin.slash")
+    }
   }
 }

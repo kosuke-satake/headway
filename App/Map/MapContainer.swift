@@ -77,6 +77,7 @@ struct MapContainer: UIViewRepresentable {
     state.offRouteVehicles = model.offRouteVehicleIDs
     if let journey = model.mapJourney {
       state.journeyID = journey.id
+      state.journeyTrips = Set(journey.rides.map(\.tripID))
       let routes = model.orderedRoutes
       let palette = model.settings.values.routePalette
       state.journeyLines = model.journeyLines.map { line in
@@ -167,11 +168,11 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
       if styleChanged || old.journeyID != new.journeyID { layers.applyStyle(new) }
       if styleChanged { layers.applyJourneyStyle(new) }
       if old.journeyID != new.journeyID { layers.setJourney(new) }
-      if styleChanged { layers.setStops(new) }
+      if styleChanged || old.journeyID != new.journeyID { layers.setStops(new) }
       if old.selectedStop != new.selectedStop { layers.setSelectedStop(new) }
       if old.vehicles != new.vehicles || old.prefs.hiddenRoutes != new.prefs.hiddenRoutes
         || old.selectedVehicle != new.selectedVehicle || old.offRouteVehicles != new.offRouteVehicles
-        || old.focus != new.focus || old.vehicleDirections != new.vehicleDirections
+        || old.focus != new.focus || old.vehicleDirections != new.vehicleDirections || old.journeyID != new.journeyID
         || old.schedule?.feedVersion != new.schedule?.feedVersion
       {
         if old.vehicles != new.vehicles || old.prefs.estimateBusPositions != new.prefs.estimateBusPositions

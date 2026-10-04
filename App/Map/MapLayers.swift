@@ -41,6 +41,7 @@ final class MapLayers {
   private var journeyWalk: MLNLineStyleLayer?
   private var journeyRides: [MLNLineStyleLayer] = []
   private var journeyPointLayers: [String: MLNCircleStyleLayer] = [:]
+  private var journeyArrows: MLNSymbolStyleLayer?
   static let journeyLegSlots = 10
   private var busRings: [String: MLNCircleStyleLayer] = [:]
   private var busDots: [String: MLNCircleStyleLayer] = [:]
@@ -120,6 +121,10 @@ final class MapLayers {
       Self.insertBelowLabels(ride, in: style)
       journeyRides.append(ride)
     }
+    let arrows = MLNSymbolStyleLayer(identifier: "journey-arrows", source: journeySource)
+    arrows.predicate = NSPredicate(format: "walk == %@", NSNumber(value: false))
+    Self.insertBelowLabels(arrows, in: style)
+    journeyArrows = arrows
     for kind in ["start", "transfer", "end"] {
       let layer = MLNCircleStyleLayer(identifier: "journey-point-\(kind)", source: journeyPointSource)
       layer.predicate = NSPredicate(format: "kind == %@", kind)
@@ -331,6 +336,15 @@ final class MapLayers {
     journeyWalk?.lineWidth = Self.ramp([10: 3, 16: 5])
     journeyWalk?.lineDashPattern = NSExpression(forConstantValue: [1.2, 1.4])
     journeyWalk?.lineCap = NSExpression(forConstantValue: "butt")
+    if let arrows = journeyArrows {
+      arrows.iconImageName = NSExpression(forConstantValue: "route-arrow")
+      arrows.symbolPlacement = NSExpression(forConstantValue: "line")
+      arrows.symbolSpacing = NSExpression(forConstantValue: 60)
+      arrows.iconRotationAlignment = NSExpression(forConstantValue: "map")
+      arrows.iconAllowsOverlap = NSExpression(forConstantValue: true)
+      arrows.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+      arrows.iconScale = Self.ramp([10: 0.6, 16: 1.0])
+    }
     let colors: [String: UIColor] = ["start": .systemGreen, "transfer": state.isDark ? .white : UIColor(white: 0.2, alpha: 1), "end": .systemRed]
     for (kind, layer) in journeyPointLayers {
       layer.circleColor = NSExpression(forConstantValue: theme.stopFill)
@@ -372,7 +386,9 @@ final class MapLayers {
     let focus = state.focus
     let network = overlay.network
     var focusedStops: Set<String>?
-    if focus.isActive {
+    if state.journeyID != nil, state.prefs.focusStyle == .hide {
+      focusedStops = []  // the journey's own points are drawn with it
+    } else if focus.isActive {
       focusedStops = focus.routes.reduce(into: Set<String>()) { $0.formUnion(network.stops(route: $1, direction: focus.direction)) }
       focusedStops?.formUnion(focus.highlightedStops)
     }
@@ -430,7 +446,9 @@ final class MapLayers {
     for bus in buses {
       let vehicle = bus.vehicle
       let route = vehicle.routeID
-      if focus.isActive {
+      if state.journeyID != nil, state.prefs.focusStyle == .hide {
+        if !state.journeyTrips.contains(vehicle.tripID) { continue }
+      } else if focus.isActive {
         if !focus.routes.contains(route) && state.prefs.focusStyle == .hide { continue }
         if focus.routes.contains(route), let direction = focus.direction, let own = state.vehicleDirections[vehicle.id], own != direction { continue }
         if !focus.highlightedBuses.isEmpty, focus.highlightedBuses[vehicle.id] == nil, state.prefs.focusStyle == .hide { continue }

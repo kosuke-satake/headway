@@ -55,6 +55,8 @@ struct MapState {
   var offRouteVehicles: Set<String> = []
   /// The journey shown on the map: an id to notice changes, its lines, and the points where legs meet.
   var journeyID: String?
+  /// Trips the journey rides; their buses are the ones to watch while a journey is shown.
+  var journeyTrips: Set<String> = []
   var journeyLines: [JourneyLine] = []
   var journeyPoints: [(coordinate: CLLocationCoordinate2D, kind: String)] = []
 }
@@ -92,9 +94,12 @@ struct RouteLook {
       busFill: bus,
       busText: RouteColors.text(on: bus),
       opacity: state.journeyID != nil ? 0.2 : (anyFocus && !isFocused ? 0.15 : 1),
-      // A route the rider asked to look at is shown even when they hide it in general.
-      visible: anyFocus
-        ? (isFocused || (prefs.focusStyle == .dim && !prefs.hiddenRoutes.contains(route.id)))
-        : !prefs.hiddenRoutes.contains(route.id))
+      // A route the rider asked to look at is shown even when they hide it in general. While a journey is shown, the
+      // routes give way to it (hidden or faded, as in Settings).
+      visible: state.journeyID != nil
+        ? (prefs.focusStyle == .dim && !prefs.hiddenRoutes.contains(route.id))
+        : anyFocus
+          ? (isFocused || (prefs.focusStyle == .dim && !prefs.hiddenRoutes.contains(route.id)))
+          : !prefs.hiddenRoutes.contains(route.id))
   }
 }

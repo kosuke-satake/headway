@@ -88,6 +88,26 @@ final class AppSettings {
 
   func removePlace(_ id: String) { values.savedPlaces.removeAll { $0.id == id } }
 
+  /// Changes a saved place: its name, what it is (Home and Work exist once, so taking the role from another place
+  /// turns that one into an ordinary place) or where it is.
+  func update(place id: String, name: String? = nil, kind: PlaceKind? = nil, point: PlanPoint? = nil) {
+    guard let index = values.savedPlaces.firstIndex(where: { $0.id == id }) else { return }
+    if let name { values.savedPlaces[index].name = name }
+    if let kind, kind != values.savedPlaces[index].kind {
+      if kind != .other {
+        for other in values.savedPlaces.indices where other != index && values.savedPlaces[other].kind == kind {
+          values.savedPlaces[other].kind = .other
+        }
+      }
+      values.savedPlaces[index].kind = kind
+    }
+    if let point {
+      values.savedPlaces[index].latitude = point.coordinate.latitude
+      values.savedPlaces[index].longitude = point.coordinate.longitude
+      values.savedPlaces[index].stopID = point.stopID
+    }
+  }
+
   func isSaved(from: PlaceChoice, to: PlaceChoice) -> Bool {
     let f = StoredEnd(from), t = StoredEnd(to)
     return values.savedTrips.contains { $0.matches(from: f, to: t) }

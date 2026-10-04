@@ -5,6 +5,9 @@ public struct PlanOptions: Sendable {
   public var maxWalkMeters = 800.0
   /// How far the rider will walk between two stops to transfer.
   public var transferWalkMeters = 250.0
+  /// When a trip starts or ends at a stop, other stops within this distance can be used instead: the stop across the
+  /// street serves the other direction, and a saved "Home" stop would otherwise force the wrong one.
+  public var stopAccessMeters = 200.0
   /// Metres per second.
   public var walkSpeed = 1.25
   /// Straight lines understate street distance; this stretches them.
@@ -169,11 +172,17 @@ public struct TripPlanner: Sendable {
   private func access(
     to point: PlanPoint, stops: [Stop], stopIndex: [String: Int], options: PlanOptions
   ) -> [(stop: Int, seconds: Double, meters: Double)] {
-    if let id = point.stopID, let index = stopIndex[id] { return [(index, 0, 0)] }
     var near: [(stop: Int, seconds: Double, meters: Double)] = []
+    // A stop chosen by the rider is free to use; stops close to it cost the walk to them.
+    let chosen = point.stopID.flatMap { stopIndex[$0] }
+    let radius = chosen == nil ? options.maxWalkMeters : min(options.stopAccessMeters, options.maxWalkMeters)
     for (index, stop) in stops.enumerated() {
+      if index == chosen {
+        near.append((index, 0, 0))
+        continue
+      }
       let meters = Geometry.distance(from: point.coordinate, to: Coordinate(latitude: stop.latitude, longitude: stop.longitude))
-      if meters <= options.maxWalkMeters {
+      if meters <= radius {
         near.append((index, meters * options.walkDetourFactor / options.walkSpeed, meters))
       }
     }
