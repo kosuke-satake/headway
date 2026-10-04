@@ -40,7 +40,11 @@ struct SettingsView: View {
           Text("High contrast uses a colour-blind-safe palette. Quiet greys the route lines; the route you look at stays coloured.")
         }
 
-        Section("Map") {
+        Section {
+          Picker("Other routes when one is chosen", selection: $settings.values.focusStyle) {
+            Text("Hide them").tag(FocusStyle.hide)
+            Text("Fade them").tag(FocusStyle.dim)
+          }
           Picker("Bus stops", selection: $settings.values.stopVisibility) {
             Text("When zoomed in").tag(StopVisibility.zoomed)
             Text("Always").tag(StopVisibility.always)
@@ -49,6 +53,10 @@ struct SettingsView: View {
           Toggle("Show stop names", isOn: $settings.values.showStopNames)
           Toggle("Remember map position", isOn: $settings.values.rememberMapPosition)
           LabeledContent("Map data", value: String(localized: "Madison area, on this device"))
+        } header: {
+          Text("Map")
+        } footer: {
+          Text("Hiding the other routes makes one route easy to follow; fading them keeps the surroundings visible.")
         }
 
         Section {

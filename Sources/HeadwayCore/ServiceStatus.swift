@@ -1,5 +1,12 @@
 import Foundation
 
+/// How far one bus is from its timetable right now.
+public struct BusDelay: Sendable, Hashable {
+  public let vehicleID: String
+  /// Seconds, positive when late.
+  public let seconds: Double
+}
+
 /// How one route is doing right now, from the buses that are reporting.
 public struct RouteStatus: Sendable, Identifiable, Hashable {
   public var id: String { routeID }
@@ -13,6 +20,13 @@ public struct RouteStatus: Sendable, Identifiable, Hashable {
   public let worstDelay: Double?
   public let lateBuses: Int  // more than five minutes late
   public let earlyBuses: Int  // more than two minutes early
+  /// The delay of each bus that could be measured, so that a list of late buses can be shown on the map.
+  public let busDelays: [BusDelay]
+
+  /// Ids of the buses more than five minutes late.
+  public var lateVehicleIDs: [String] { busDelays.filter { $0.seconds > ServiceStatusBuilder.lateThreshold }.map(\.vehicleID) }
+  /// Ids of the buses more than two minutes early.
+  public var earlyVehicleIDs: [String] { busDelays.filter { $0.seconds < ServiceStatusBuilder.earlyThreshold }.map(\.vehicleID) }
 }
 
 /// A trip that should be running according to the timetable but has no bus reporting a position.
@@ -45,22 +59,23 @@ public enum ServiceStatusBuilder {
     var predictionByTrip: [String: TripPrediction] = [:]
     for prediction in predictions where !prediction.tripID.isEmpty { predictionByTrip[prediction.tripID] = prediction }
 
-    var delays: [String: [Double]] = [:]
+    var delays: [String: [BusDelay]] = [:]
     var buses: [String: Int] = [:]
     for vehicle in vehicles {
       buses[vehicle.routeID, default: 0] += 1
       guard let delay = delay(of: vehicle, prediction: predictionByTrip[vehicle.tripID], schedule: schedule, now: now) else {
         continue
       }
-      delays[vehicle.routeID, default: []].append(delay)
+      delays[vehicle.routeID, default: []].append(BusDelay(vehicleID: vehicle.id, seconds: delay))
     }
     let routes = buses.map { routeID, count -> RouteStatus in
-      let measured = delays[routeID] ?? []
+      let measured = (delays[routeID] ?? []).sorted { $0.seconds > $1.seconds }
+      let seconds = measured.map(\.seconds)
       return RouteStatus(
         routeID: routeID, buses: count, measured: measured.count,
-        averageDelay: measured.isEmpty ? nil : measured.reduce(0, +) / Double(measured.count),
-        worstDelay: measured.max(), lateBuses: measured.filter { $0 > lateThreshold }.count,
-        earlyBuses: measured.filter { $0 < earlyThreshold }.count)
+        averageDelay: seconds.isEmpty ? nil : seconds.reduce(0, +) / Double(seconds.count),
+        worstDelay: seconds.max(), lateBuses: seconds.filter { $0 > lateThreshold }.count,
+        earlyBuses: seconds.filter { $0 < earlyThreshold }.count, busDelays: measured)
     }
     .sorted { (schedule.routes[$0.routeID]?.sortOrder ?? .max, $0.routeID) < (schedule.routes[$1.routeID]?.sortOrder ?? .max, $1.routeID) }
 
@@ -84,7 +99,7 @@ public enum ServiceStatusBuilder {
   }
 
   /// Predicted time at the next stop minus the timetable, in seconds.
-  static func delay(of vehicle: VehicleSample, prediction: TripPrediction?, schedule: Schedule, now: Date) -> Double? {
+  public static func delay(of vehicle: VehicleSample, prediction: TripPrediction?, schedule: Schedule, now: Date) -> Double? {
     guard let prediction, let date = schedule.serviceDate(of: vehicle.tripID, near: now) else { return nil }
     for stop in prediction.stops where !stop.skipped {
       guard let predicted = stop.arrival ?? stop.departure, predicted >= now.addingTimeInterval(-60),

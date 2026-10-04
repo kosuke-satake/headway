@@ -33,6 +33,7 @@ struct InfoView: View {
     Section {
       let status = model.status
       let late = status?.routes.filter { $0.lateBuses > 0 }.count ?? 0
+      let early = status?.routes.reduce(0) { $0 + $1.earlyBuses } ?? 0
       VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .firstTextBaseline) {
           Text("\(status?.busesOnRoad ?? model.vehicles.count)").font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
@@ -42,8 +43,17 @@ struct InfoView: View {
         }
         HStack(spacing: 8) {
           SummaryChip(symbol: "exclamationmark.triangle.fill", tint: .orange, text: String(localized: "\(model.visibleActiveAlerts.count) alerts"))
-          SummaryChip(symbol: "clock.badge.exclamationmark", tint: late > 0 ? .red : .green,
-            text: late > 0 ? String(localized: "\(late) routes late") : String(localized: "No late routes"))
+          Button { if late > 0 { model.focusDelays() } } label: {
+            SummaryChip(symbol: "clock.badge.exclamationmark", tint: late > 0 ? .red : .green,
+              text: late > 0 ? String(localized: "\(late) routes late") : String(localized: "No late routes"))
+          }
+          .buttonStyle(.plain)
+          if early > 0 {
+            Button { model.focusDelays(late: false, early: true) } label: {
+              SummaryChip(symbol: "clock.arrow.circlepath", tint: .blue, text: String(localized: "\(early) buses early"))
+            }
+            .buttonStyle(.plain)
+          }
         }
       }
       .padding(.vertical, 4)
@@ -218,9 +228,19 @@ struct AlertCard: View {
       .buttonStyle(.plain)
       if expanded {
         Text(alert.detail).font(.footnote).foregroundStyle(.secondary)
-        if let url = alert.url {
-          Link(destination: url) { Label("Detour details", systemImage: "arrow.up.right.square") }.font(.footnote.weight(.medium))
+      }
+      if expanded || alert.detail.isEmpty {
+        HStack(spacing: 16) {
+          if model.alertCanBeShown(alert) {
+            Button { model.focusAlert(alert) } label: { Label("Show on map", systemImage: "map") }
+          }
+          if let url = alert.url {
+            Link(destination: url) { Label("Detour details", systemImage: "arrow.up.right.square") }
+          }
         }
+        .font(.footnote.weight(.medium))
+        // Inside a list row, plain buttons would share one tap target (the last link would win).
+        .buttonStyle(.borderless)
       }
     }
     .padding(.vertical, 2)
@@ -241,6 +261,14 @@ private struct RouteStatusRow: View {
   let status: RouteStatus
 
   var body: some View {
+    Button {
+      guard model.route(status.routeID) != nil else { return }
+      model.focusDelays(route: status.routeID, late: true, early: true)
+    } label: { content }
+    .buttonStyle(.plain)
+  }
+
+  private var content: some View {
     HStack(spacing: 12) {
       if model.route(status.routeID) != nil {
         RouteBadge(routeID: status.routeID)
@@ -258,6 +286,9 @@ private struct RouteStatusRow: View {
           Text("No prediction").font(.caption).foregroundStyle(.secondary)
         } else if status.lateBuses > 0 {
           Text("\(status.lateBuses) buses more than 5 min late").font(.caption).foregroundStyle(.red)
+        }
+        if status.earlyBuses > 0 {
+          Text("\(status.earlyBuses) buses more than 2 min early").font(.caption).foregroundStyle(.blue)
         }
       }
       Spacer(minLength: 8)
@@ -294,6 +325,9 @@ private struct FavoriteStopRow: View {
     } label: {
       VStack(alignment: .leading, spacing: 6) {
         Text(stop.name).font(.subheadline.weight(.semibold))
+        if let toward = headsigns(of: arrivals) {
+          Text("To \(toward)").font(.caption).foregroundStyle(.secondary)
+        }
         if arrivals.isEmpty {
           Text("No buses soon").font(.caption).foregroundStyle(.secondary)
         } else {
@@ -311,6 +345,17 @@ private struct FavoriteStopRow: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+  }
+
+  /// The destinations of the next buses ("2-Airport"): two stops with the same name, one on each side of the street,
+  /// can only be told apart by where their buses go.
+  private func headsigns(of arrivals: [Arrival]) -> String? {
+    var seen: [String] = []
+    for arrival in arrivals where !arrival.headsign.isEmpty {
+      let name = arrival.headsign.prettyHeadsign
+      if !seen.contains(name) { seen.append(name) }
+    }
+    return seen.isEmpty ? nil : seen.joined(separator: ", ")
   }
 
   private func upcoming() -> [Arrival] {

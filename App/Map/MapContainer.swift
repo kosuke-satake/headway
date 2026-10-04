@@ -62,11 +62,12 @@ struct MapContainer: UIViewRepresentable {
 
   func updateUIView(_ mapView: MLNMapView, context: Context) {
     var state = MapState()
+    state.overlay = model.overlay
     state.schedule = model.schedule
-    state.routesByStop = model.routesByStop
     state.vehicles = model.vehicles
+    state.vehicleDirections = model.vehicleDirections
     state.prefs = MapPreferences(model.settings.values)
-    state.focusedRoute = model.focusedRouteID
+    state.focus = model.focus
     state.selectedStop = model.selectedStopID
     state.selectedVehicle = model.selectedVehicle?.id
     state.isDark = colorScheme == .dark
@@ -114,7 +115,7 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
   private weak var mapView: MLNMapView?
   private var layers: MapLayers?
   private var state = MapState()
-  private var appliedStyleSchedule: String?
+  private var appliedOverlay: String?
   private var lastCameraID: UUID?
   private var lastFitID: UUID?
   private let animator = BusAnimator()
@@ -151,21 +152,31 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     }
     if new.locationAuthorized != old.locationAuthorized { mapView.showsUserLocation = new.locationAuthorized }
 
-    if layers == nil, new.schedule != nil, new.isDark == old.isDark, let style = mapView.style {
+    if let overlay = new.overlay, appliedOverlay != nil, appliedOverlay != overlay.feedVersion, new.isDark == old.isDark {
+      // A new timetable replaced the one the layers were built from: build them again.
+      layers = nil
+      appliedOverlay = nil
+      mapView.reloadStyle(nil)
+    }
+    if layers == nil, new.overlay != nil, new.isDark == old.isDark, let style = mapView.style {
       buildLayers(style: style)
     }
     if let layers {
-      let styleChanged = old.prefs != new.prefs || old.focusedRoute != new.focusedRoute || old.isDark != new.isDark
-        || old.schedule?.feedVersion != new.schedule?.feedVersion || old.alertRoutes != new.alertRoutes
+      let styleChanged = old.prefs != new.prefs || old.focus != new.focus || old.isDark != new.isDark
+        || old.alertRoutes != new.alertRoutes
       if styleChanged || old.journeyID != new.journeyID { layers.applyStyle(new) }
       if styleChanged { layers.applyJourneyStyle(new) }
       if old.journeyID != new.journeyID { layers.setJourney(new) }
-      if styleChanged || old.routesByStop.count != new.routesByStop.count { layers.setStops(new) }
+      if styleChanged { layers.setStops(new) }
       if old.selectedStop != new.selectedStop { layers.setSelectedStop(new) }
       if old.vehicles != new.vehicles || old.prefs.hiddenRoutes != new.prefs.hiddenRoutes
         || old.selectedVehicle != new.selectedVehicle || old.offRouteVehicles != new.offRouteVehicles
+        || old.focus != new.focus || old.vehicleDirections != new.vehicleDirections
+        || old.schedule?.feedVersion != new.schedule?.feedVersion
       {
-        if old.vehicles != new.vehicles || old.prefs.estimateBusPositions != new.prefs.estimateBusPositions {
+        if old.vehicles != new.vehicles || old.prefs.estimateBusPositions != new.prefs.estimateBusPositions
+          || old.schedule?.feedVersion != new.schedule?.feedVersion
+        {
           animator.update(
             vehicles: new.vehicles, schedule: new.schedule, estimate: new.prefs.estimateBusPositions,
             smooth: new.prefs.smoothBusMovement, now: CACurrentMediaTime(), wall: Date())
@@ -186,10 +197,10 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
   }
 
   private func buildLayers(style: MLNStyle) {
-    guard let schedule = state.schedule else { return }
-    let built = MapLayers(style: style, schedule: schedule)
+    guard let overlay = state.overlay else { return }
+    let built = MapLayers(style: style, overlay: overlay)
     layers = built
-    appliedStyleSchedule = schedule.feedVersion
+    appliedOverlay = overlay.feedVersion
     built.applyStyle(state)
     built.applyJourneyStyle(state)
     built.setJourney(state)
@@ -259,7 +270,7 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
 
   func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
     layers = nil
-    if state.schedule != nil { buildLayers(style: style) }
+    if state.overlay != nil { buildLayers(style: style) }
   }
 
   func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {

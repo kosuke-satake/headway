@@ -16,7 +16,7 @@ struct RootView: View {
       if model.mode == .map {
         VStack(spacing: 8) {
           StatusPill()
-          if let focus = model.focusedRouteID { FocusChip(routeID: focus) }
+          if model.focus.isActive { FocusChip() }
           if case .failed(let message) = model.phase { FailureBanner(message: message) }
         }
         .padding(.top, 8)
@@ -144,15 +144,30 @@ private struct StatusPill: View {
   }
 }
 
+/// Says what the map is limited to, and lets the rider change the direction or go back to all routes.
 private struct FocusChip: View {
   @Environment(AppModel.self) private var model
-  let routeID: String
 
   var body: some View {
+    let focus = model.focus
+    let single = focus.routes.count == 1 ? focus.routes.first : nil
     HStack(spacing: 8) {
-      RouteBadge(routeID: routeID, compact: true)
-      Text("Showing only this route").font(.footnote.weight(.medium))
-      Button { model.focusedRouteID = nil } label: {
+      if let single { RouteBadge(routeID: single, compact: true) }
+      Text(title(focus, single: single)).font(.footnote.weight(.medium)).lineLimit(1)
+      if let single, focus.label == nil, model.variants(of: single).count > 1 {
+        Menu {
+          Button { model.setFocusDirection(nil) } label: { Label("Both directions", systemImage: focus.direction == nil ? "checkmark" : "arrow.left.arrow.right") }
+          ForEach(model.variants(of: single), id: \.direction) { variant in
+            Button { model.setFocusDirection(variant.direction) } label: {
+              Label(model.directionTitle(route: single, direction: variant.direction), systemImage: focus.direction == variant.direction ? "checkmark" : model.directionSymbol(route: single, direction: variant.direction))
+            }
+          }
+        } label: {
+          Image(systemName: "arrow.left.arrow.right.circle.fill").foregroundStyle(.blue)
+        }
+        .accessibilityLabel(Text("Change direction"))
+      }
+      Button { model.clearFocus() } label: {
         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
       }
       .accessibilityLabel(Text("Show all routes"))
@@ -160,6 +175,13 @@ private struct FocusChip: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .background(.regularMaterial, in: Capsule())
+  }
+
+  private func title(_ focus: MapFocus, single: String?) -> String {
+    if let label = focus.label { return label }
+    guard let single else { return String(localized: "Showing only these routes") }
+    if let direction = focus.direction { return model.directionTitle(route: single, direction: direction) }
+    return String(localized: "Both directions")
   }
 }
 

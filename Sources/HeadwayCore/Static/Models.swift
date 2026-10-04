@@ -36,6 +36,8 @@ public struct Trip: Sendable, Identifiable, Hashable {
   public let routeID: String
   public let serviceID: String
   public let headsign: String
+  /// GTFS extension `trip_direction_name`, for example "Westbound".
+  public let directionName: String
   public let directionID: Int
   public let shapeID: String
   public let blockID: String

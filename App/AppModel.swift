@@ -77,10 +77,11 @@ final class AppModel {
   /// When on, the stop sheet and timetable also show routes the user chose to hide.
   var showHiddenRoutes = false
   private(set) var arrivals: [Arrival] = []
-  /// Route ids serving each stop, ordered like the route list.
-  private(set) var routesByStop: [String: [String]] = [:]
-  /// The most common destinations of each route, for the route list.
-  private(set) var headsignsByRoute: [String: [String]] = [:]
+  /// What the map draws: route lines, stops and the route network. Loaded from a saved copy at launch, so that the map
+  /// is complete before the timetable has been parsed.
+  private(set) var overlay: MapOverlay?
+  /// Direction (0 or 1) of each live bus's trip.
+  private(set) var vehicleDirections: [String: Int] = [:]
   /// True when the board shows service after the next three hours because nothing else is coming.
   private(set) var arrivalsAreLater = false
   /// The stop to go back to from a bus opened out of that stop's board.
@@ -110,15 +111,14 @@ final class AppModel {
   private(set) var journeyLines: [JourneyPolyline] = []
   private(set) var fitRequest: FitRequest?
   private(set) var status: ServiceStatus?
-  /// A route the user has tapped to look at on its own; every other route is dimmed.
-  var focusedRouteID: String?
+  /// What the user asked the map to show on its own (a route, an alert, late buses); everything else is hidden or dimmed.
+  private(set) var focus = MapFocus()
   private(set) var cameraRequest: CameraRequest?
 
   @ObservationIgnored private let client = RealtimeClient()
   @ObservationIgnored private var pollTask: Task<Void, Never>?
   @ObservationIgnored private var started = false
   @ObservationIgnored private var isActive = true
-  @ObservationIgnored private var focusFromBus = false
   @ObservationIgnored private var lastAlertFetch = Date.distantPast
   @ObservationIgnored private var feedTimestamp: Date?
   @ObservationIgnored private var feedPeriod: TimeInterval = 30
@@ -142,11 +142,15 @@ final class AppModel {
     return nil
   }
 
-  var orderedRoutes: [Route] {
-    (schedule?.routes.values.sorted { ($0.sortOrder, $0.id) < ($1.sortOrder, $1.id) }) ?? []
-  }
+  var orderedRoutes: [Route] { overlay?.orderedRoutes ?? [] }
 
-  func route(_ id: String) -> Route? { schedule?.routes[id] }
+  func route(_ id: String) -> Route? { overlay?.routes[id] ?? schedule?.routes[id] }
+
+  /// Route ids serving each stop, ordered like the route list.
+  var routesByStop: [String: [String]] { overlay?.network.routesByStop ?? [:] }
+
+  /// The ways a route runs (one entry per direction).
+  func variants(of route: String) -> [RouteVariant] { overlay?.network.variants(of: route) ?? [] }
 
   var hiddenRoutes: Set<String> { settings.values.hiddenRoutes }
 
@@ -196,6 +200,10 @@ final class AppModel {
     started = true
     restartPolling()
     Task { await loadPunctuality() }
+    // The saved copy of the map data shows every route right away; the timetable is parsed behind it.
+    if let saved = await Task.detached(priority: .userInitiated, operation: { OverlayStore.load() }).value, overlay == nil {
+      overlay = saved
+    }
     await loadSchedule()
   }
 
@@ -232,9 +240,10 @@ final class AppModel {
     sheet = .bus(vehicleID)
     if let vehicle = vehicles.first(where: { $0.id == vehicleID }) {
       fly(to: vehicle.latitude, vehicle.longitude, minimumZoom: 14)
-      if focusedRouteID == nil {
-        focusedRouteID = vehicle.routeID
-        focusFromBus = true
+      if !focus.isActive {
+        var next = MapFocus.route(vehicle.routeID, direction: vehicleDirections[vehicle.id])
+        next.fromBus = true
+        focus = next
       }
     }
   }
@@ -334,9 +343,127 @@ final class AppModel {
     sheet = nil
   }
 
+  /// Shows only `id` (in one direction, or both) and fits the camera to it.
+  func focusRoute(_ id: String, direction: Int? = nil) {
+    focus = .route(id, direction: direction)
+    if mode != .map { mode = .map }
+    fitToFocus()
+  }
+
+  /// A tap on a route line: look at that route alone, or leave the focus when it is already the one.
   func toggleFocus(route id: String) {
-    focusFromBus = false
-    focusedRouteID = focusedRouteID == id ? nil : id
+    if focus.routes == [id], focus.highlightedStops.isEmpty, focus.highlightedBuses.isEmpty {
+      focus = MapFocus()
+    } else {
+      focusRoute(id, direction: nil)
+    }
+  }
+
+  func clearFocus() { focus = MapFocus() }
+
+  /// Changes the direction of the route in focus (nil for both).
+  func setFocusDirection(_ direction: Int?) {
+    guard focus.routes.count == 1 else { return }
+    focus.direction = direction
+    focus.fromBus = false
+    fitToFocus()
+  }
+
+  /// "Show on map" for an alert: its routes, and the stops its text names, ringed.
+  func focusAlert(_ alert: ServiceAlert) {
+    let routes = alert.routeIDs.filter { overlay?.routes[$0] != nil }
+    guard !routes.isEmpty else { return }
+    var next = MapFocus(routes: Set(routes))
+    next.highlightedStops = alertStops(alert)
+    next.label = alert.header
+    focus = next
+    sheet = nil
+    mode = .map
+    fitToFocus()
+  }
+
+  /// Rings these buses (late or early) and hides the others.
+  func focusBuses(_ buses: [String: BusHighlight], label: String) {
+    let routes = Set(buses.keys.compactMap { id in vehicles.first { $0.id == id }?.routeID })
+    guard !routes.isEmpty else { return }
+    var next = MapFocus(routes: routes)
+    next.highlightedBuses = buses
+    next.label = label
+    focus = next
+    sheet = nil
+    mode = .map
+    fitToFocus()
+  }
+
+  /// True when the map has something to show for an alert (it names a route).
+  func alertCanBeShown(_ alert: ServiceAlert) -> Bool { alert.routeIDs.contains { overlay?.routes[$0] != nil } }
+
+  /// Shows the buses that are running late or early (all routes, or one) and rings them on the map.
+  func focusDelays(route: String? = nil, late: Bool = true, early: Bool = false) {
+    guard let status else { return }
+    var buses: [String: BusHighlight] = [:]
+    for row in status.routes where route == nil || row.routeID == route {
+      if late { for id in row.lateVehicleIDs { buses[id] = .late } }
+      if early { for id in row.earlyVehicleIDs { buses[id] = .early } }
+    }
+    if buses.isEmpty, let route {
+      focusRoute(route)
+    } else {
+      let label = late && early ? String(localized: "Late and early buses") : (late ? String(localized: "Late buses") : String(localized: "Early buses"))
+      focusBuses(buses, label: label)
+    }
+  }
+
+  /// Stops an alert is about: the ids it lists, plus stop codes written in its text ("stop 1234").
+  func alertStops(_ alert: ServiceAlert) -> [String] {
+    guard let overlay else { return [] }
+    var found = alert.stopIDs.filter { overlay.stops[$0] != nil }
+    let byCode = Dictionary(overlay.data.stops.filter { !$0.code.isEmpty }.map { ($0.code, $0.id) }, uniquingKeysWith: { first, _ in first })
+    for code in StopCodes.find(in: alert.header + " " + alert.detail) {
+      if let id = byCode[code], !found.contains(id) { found.append(id) }
+    }
+    return found
+  }
+
+  /// Zooms the map out to show what is in focus.
+  private func fitToFocus() {
+    guard let overlay, focus.isActive else { return }
+    var points: [Coordinate] = []
+    for route in focus.routes { points += overlay.coordinates(route: route, direction: focus.direction) }
+    for id in focus.highlightedStops { if let stop = overlay.stops[id] { points.append(Coordinate(latitude: stop.latitude, longitude: stop.longitude)) } }
+    for id in focus.highlightedBuses.keys { if let bus = vehicles.first(where: { $0.id == id }) { points.append(Coordinate(latitude: bus.latitude, longitude: bus.longitude)) } }
+    if !points.isEmpty { fitRequest = FitRequest(coordinates: points) }
+  }
+
+  /// The feed's direction name in the app's language ("Westbound" is "西行き"); other names are shown as the feed has them.
+  private static func compassName(_ name: String) -> String {
+    switch name.lowercased() {
+    case "eastbound": String(localized: "Eastbound")
+    case "westbound": String(localized: "Westbound")
+    case "northbound": String(localized: "Northbound")
+    case "southbound": String(localized: "Southbound")
+    default: name.capitalized
+    }
+  }
+
+  /// An arrow for the compass direction a route runs in ("Westbound" is an arrow to the left).
+  func directionSymbol(route: String, direction: Int) -> String {
+    switch variants(of: route).first(where: { $0.direction == direction })?.directionName.lowercased() {
+    case "eastbound": "arrow.right"
+    case "westbound": "arrow.left"
+    case "northbound": "arrow.up"
+    case "southbound": "arrow.down"
+    default: "arrow.right"
+    }
+  }
+
+  /// "Westbound to Airport, Epic Campus" for the direction of a route.
+  func directionTitle(route: String, direction: Int) -> String {
+    guard let variant = variants(of: route).first(where: { $0.direction == direction }) else { return "" }
+    let places = variant.headsigns.map(\.prettyHeadsign).joined(separator: ", ")
+    let name = Self.compassName(variant.directionName)
+    if name.isEmpty { return places }
+    return places.isEmpty ? name : String(localized: "\(name) to \(places)")
   }
 
   func fly(to latitude: Double, _ longitude: Double, minimumZoom: Double) {
@@ -353,10 +480,7 @@ final class AppModel {
   private func selectionChanged() {
     showHiddenRoutes = false
     // Closing a bus sheet releases the route that selecting the bus focused.
-    if sheet == nil, focusFromBus {
-      focusedRouteID = nil
-      focusFromBus = false
-    }
+    if sheet == nil, focus.fromBus { focus = MapFocus() }
     refreshArrivals()
     restartPolling()  // trip predictions are only fetched while a stop or bus is open
   }
@@ -398,22 +522,33 @@ final class AppModel {
 
   private struct Parsed {
     let schedule: Schedule
-    let routesByStop: [String: [String]]
-    let headsigns: [String: [String]]
+    let overlay: MapOverlayData
   }
 
   private static func parse(_ url: URL) async throws -> Parsed {
     let schedule = try await Task.detached(priority: .userInitiated) { try Schedule.load(zipAt: url) }.value
-    let index = await Task.detached(priority: .utility) { Self.routesByStop(in: schedule) }.value
-    let headsigns = await Task.detached(priority: .utility) { Self.headsigns(in: schedule) }.value
-    return Parsed(schedule: schedule, routesByStop: index, headsigns: headsigns)
+    let overlay = await Task.detached(priority: .utility) { MapOverlayData(schedule: schedule, network: RouteNetwork(schedule: schedule)) }.value
+    return Parsed(schedule: schedule, overlay: overlay)
   }
 
   private func apply(_ parsed: Parsed) async throws {
     schedule = parsed.schedule
-    routesByStop = parsed.routesByStop
-    headsignsByRoute = parsed.headsigns
+    // The map keeps what it has when the new timetable describes the same feed; otherwise it is rebuilt and saved.
+    if overlay?.feedVersion != parsed.overlay.feedVersion {
+      overlay = MapOverlay(parsed.overlay)
+      let data = parsed.overlay
+      Task.detached(priority: .utility) { OverlayStore.save(data) }
+    }
+    vehicleDirections = directions(of: vehicles)
     refreshArrivals()
+  }
+
+  /// The direction of each bus's trip, from the timetable.
+  private func directions(of vehicles: [VehicleSample]) -> [String: Int] {
+    guard let schedule else { return [:] }
+    var result: [String: Int] = [:]
+    for vehicle in vehicles { if let trip = schedule.trips[vehicle.tripID] { result[vehicle.id] = trip.directionID } }
+    return result
   }
 
   /// Fetches the timetable at most once a day (or when `force` is set). A new feed replaces the loaded one only if its
@@ -453,28 +588,6 @@ final class AppModel {
     }
   }
 
-  nonisolated private static func routesByStop(in schedule: Schedule) -> [String: [String]] {
-    var result: [String: [String]] = [:]
-    for (stopID, visits) in schedule.visitsByStop {
-      var routes: Set<String> = []
-      for visit in visits { if let trip = schedule.trips[visit.tripID] { routes.insert(trip.routeID) } }
-      result[stopID] = routes.sorted {
-        let a = schedule.routes[$0]?.sortOrder ?? .max
-        let b = schedule.routes[$1]?.sortOrder ?? .max
-        return (a, $0) < (b, $1)
-      }
-    }
-    return result
-  }
-
-  nonisolated private static func headsigns(in schedule: Schedule) -> [String: [String]] {
-    var counts: [String: [String: Int]] = [:]
-    for trip in schedule.trips.values where !trip.headsign.isEmpty { counts[trip.routeID, default: [:]][trip.headsign, default: 0] += 1 }
-    return counts.mapValues { byHeadsign in
-      byHeadsign.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.prefix(2).map(\.key)
-    }
-  }
-
   // MARK: Live data
 
   private func restartPolling() {
@@ -501,6 +614,7 @@ final class AppModel {
           if let old = feedTimestamp, let new = snapshot.feedTimestamp, new > old { notePeriod(new.timeIntervalSince(old)) }
           feedTimestamp = snapshot.feedTimestamp
           vehicles = snapshot.vehicles
+          vehicleDirections = directions(of: snapshot.vehicles)
           offRouteVehicleIDs = computeOffRoute(snapshot.vehicles)
           unchanged = 0
           lastChange = Date()

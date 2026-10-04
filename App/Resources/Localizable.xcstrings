@@ -3199,6 +3199,237 @@
           }
         }
       }
+    },
+    "Both directions": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "両方向"
+          }
+        }
+      }
+    },
+    "Showing only these routes": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選んだ路線だけを表示中"
+          }
+        }
+      }
+    },
+    "Change direction": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "方向を切り替え"
+          }
+        }
+      }
+    },
+    "Showing both directions": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "両方向を表示中"
+          }
+        }
+      }
+    },
+    "Showing one direction": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "片方向を表示中"
+          }
+        }
+      }
+    },
+    "Tap a route, or one of its directions, to see only that and its stops. Use the switch to hide a route from the map.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "路線（または方向）をタップすると、その路線とバス停だけを表示します。スイッチで路線を地図から隠せます。"
+          }
+        }
+      }
+    },
+    "%@ to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@・%2$@ 方面"
+          }
+        }
+      }
+    },
+    "Eastbound": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "東行き"
+          }
+        }
+      }
+    },
+    "Westbound": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "西行き"
+          }
+        }
+      }
+    },
+    "Northbound": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "北行き"
+          }
+        }
+      }
+    },
+    "Southbound": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "南行き"
+          }
+        }
+      }
+    },
+    "Other routes when one is chosen": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "路線を選んだときの他の路線"
+          }
+        }
+      }
+    },
+    "Hide them": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隠す"
+          }
+        }
+      }
+    },
+    "Fade them": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "薄く表示"
+          }
+        }
+      }
+    },
+    "Hiding the other routes makes one route easy to follow; fading them keeps the surroundings visible.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "他の路線を隠すと、選んだ路線を追いやすくなります。薄く表示すると、周りの路線も見えたままです。"
+          }
+        }
+      }
+    },
+    "Late buses": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遅れているバス"
+          }
+        }
+      }
+    },
+    "Early buses": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早く走っているバス"
+          }
+        }
+      }
+    },
+    "Late and early buses": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遅れ・早着のバス"
+          }
+        }
+      }
+    },
+    "%lld buses early": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld台が早着"
+          }
+        }
+      }
+    },
+    "%lld buses more than 2 min early": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld台が2分以上早着"
+          }
+        }
+      }
+    },
+    "To %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 行き"
+          }
+        }
+      }
     }
   }
 }

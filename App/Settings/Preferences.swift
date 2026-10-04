@@ -62,6 +62,7 @@ struct Preferences: Codable, Equatable {
   var markerSize: MarkerSize = .medium
   var showRouteNameOnBuses = true
   var routeLineWidth: Double = 1.0  // multiplier, 0.6...1.6
+  var focusStyle: FocusStyle = .hide
   var stopVisibility: StopVisibility = .zoomed
   var showStopNames = true
 
@@ -118,6 +119,7 @@ struct Preferences: Codable, Equatable {
     markerSize = value(.markerSize, d.markerSize)
     showRouteNameOnBuses = value(.showRouteNameOnBuses, d.showRouteNameOnBuses)
     routeLineWidth = min(1.6, max(0.6, value(.routeLineWidth, d.routeLineWidth)))
+    focusStyle = value(.focusStyle, d.focusStyle)
     stopVisibility = value(.stopVisibility, d.stopVisibility)
     showStopNames = value(.showStopNames, d.showStopNames)
     // Earlier versions stored 5, 10 or 15 seconds; those now mean "follow the feed".
@@ -150,7 +152,7 @@ struct Preferences: Codable, Equatable {
   }
 
   private enum Key: String, CodingKey {
-    case appearance, routePalette, markerSize, showRouteNameOnBuses, routeLineWidth, stopVisibility, showStopNames
+    case appearance, routePalette, markerSize, showRouteNameOnBuses, routeLineWidth, focusStyle, stopVisibility, showStopNames
     case updateInterval, smoothBusMovement, estimateBusPositions, pauseLiveInBackground
     case clockFormat, arrivalStyle, showDelayDetails
     case hapticFeedback, rememberMapPosition

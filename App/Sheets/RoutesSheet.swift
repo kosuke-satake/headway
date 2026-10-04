@@ -18,7 +18,7 @@ struct RoutesSheet: View {
         } header: {
           Text("All routes")
         } footer: {
-          Text("Tap a route to see only that route and its stops. Use the switch to hide a route from the map.")
+          Text("Tap a route, or one of its directions, to see only that and its stops. Use the switch to hide a route from the map.")
         }
       }
       .navigationTitle("Routes")
@@ -35,30 +35,52 @@ struct RoutesSheet: View {
     }
   }
 
+  /// One route: a header that shows both directions, and one line per direction (they often use different streets).
   private func row(_ route: Route) -> some View {
     let hidden = model.settings.values.hiddenRoutes.contains(route.id)
-    return HStack(spacing: 12) {
-      Button {
-        model.toggleFocus(route: route.id)
-        model.settings.setRoute(route.id, hidden: false)
-        dismiss()
-      } label: {
-        HStack(spacing: 12) {
-          RouteBadge(routeID: route.id)
-          VStack(alignment: .leading, spacing: 2) {
-            Text((model.headsignsByRoute[route.id] ?? []).map(\.prettyHeadsign).joined(separator: " · "))
-              .font(.subheadline).lineLimit(2)
-            if let match = model.reliability(route: route.id, stop: nil) {
-              Text("Usually \(Int((match.cell.onTimeShare * 100).rounded()))% on time right now").font(.caption).foregroundStyle(.secondary)
+    let variants = model.variants(of: route.id)
+    return HStack(alignment: .top, spacing: 12) {
+      VStack(alignment: .leading, spacing: 8) {
+        Button {
+          model.settings.setRoute(route.id, hidden: false)
+          model.focusRoute(route.id)
+          dismiss()
+        } label: {
+          HStack(spacing: 12) {
+            RouteBadge(routeID: route.id)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(route.longName.isEmpty ? String(localized: "Both directions") : route.longName).font(.subheadline).lineLimit(2)
+              if let match = model.reliability(route: route.id, stop: nil) {
+                Text("Usually \(Int((match.cell.onTimeShare * 100).rounded()))% on time right now").font(.caption).foregroundStyle(.secondary)
+              }
+              if model.focus.routes == [route.id] {
+                Text(model.focus.direction == nil ? "Showing both directions" : "Showing one direction").font(.caption).foregroundStyle(.blue)
+              }
             }
-            if model.focusedRouteID == route.id { Text("Showing only this route").font(.caption).foregroundStyle(.blue) }
+            Spacer(minLength: 0)
           }
-          Spacer(minLength: 0)
+          .contentShape(Rectangle())
         }
-        .opacity(hidden ? 0.4 : 1)
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
+        ForEach(variants, id: \.direction) { variant in
+          Button {
+            model.settings.setRoute(route.id, hidden: false)
+            model.focusRoute(route.id, direction: variant.direction)
+            dismiss()
+          } label: {
+            Label(model.directionTitle(route: route.id, direction: variant.direction), systemImage: model.directionSymbol(route: route.id, direction: variant.direction))
+              .font(.footnote)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
+              .foregroundStyle(model.focus.routes == [route.id] && model.focus.direction == variant.direction ? Color.blue : Color.primary)
+              .padding(.leading, 46)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+        }
       }
-      .buttonStyle(.plain)
+      .opacity(hidden ? 0.4 : 1)
       Toggle("Show \(route.shortName) on the map", isOn: Binding(
         get: { !hidden }, set: { model.settings.setRoute(route.id, hidden: !$0) }))
         .labelsHidden()

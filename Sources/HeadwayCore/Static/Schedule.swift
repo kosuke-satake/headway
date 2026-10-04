@@ -129,6 +129,7 @@ public struct Schedule: Sendable {
         routeID: row.string(th["route_id"]),
         serviceID: row.string(th["service_id"]),
         headsign: row.string(th["trip_headsign"]),
+        directionName: row.string(th["trip_direction_name"]),
         directionID: row.int(th["direction_id"]) ?? 0,
         shapeID: row.string(th["shape_id"]),
         blockID: row.string(th["block_id"]),
