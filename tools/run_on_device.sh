@@ -42,9 +42,11 @@ PY
   DEVICE="${FOUND%%|*}"
   NAME=$(echo "$FOUND" | cut -d'|' -f2)
   STATE="${FOUND##*|}"
-  if [ "$STATE" != "connected" ]; then
-    echo "$NAME is paired but not connected right now (state: ${STATE:-unknown})."
-    echo "Plug it in with the cable (or turn on Wi-Fi sync in Finder), unlock it, and run this again."
+  # A paired device often reports "disconnected" until something connects to it (that is normal for wireless use), so
+  # try to reach it instead of trusting the state.
+  if ! xcrun devicectl device info details --device "$DEVICE" >/dev/null 2>&1; then
+    echo "$NAME is paired but cannot be reached. Plug it in with the cable (or enable \"Connect via network\" in Xcode >"
+    echo "Window > Devices and Simulators), unlock it, and run this again."
     [ "${CHECK_ONLY:-}" = "1" ] || exit 1
   fi
   echo "Found $NAME"
@@ -52,8 +54,20 @@ fi
 [ "${CHECK_ONLY:-}" = "1" ] && exit 0
 echo "Device: $DEVICE"
 
-xcodebuild -project Headway.xcodeproj -scheme Headway -configuration Debug \
-  -destination "id=$DEVICE" -derivedDataPath build/Device -allowProvisioningUpdates build | tail -n 5
+LOG="build/device-build.log"
+mkdir -p build
+if ! xcodebuild -project Headway.xcodeproj -scheme Headway -configuration Debug \
+  -destination "id=$DEVICE" -derivedDataPath build/Device -allowProvisioningUpdates build > "$LOG" 2>&1; then
+  echo "Build failed. Errors:"
+  grep -E "error:" "$LOG" | sort -u | head -n 10
+  echo "(full log: $LOG; the first build after adding an Apple ID sometimes fails while Xcode creates the signing profile, so try once more)"
+  exit 1
+fi
 APP="build/Device/Build/Products/Debug-iphoneos/Headway.app"
 xcrun devicectl device install app --device "$DEVICE" "$APP"
-xcrun devicectl device process launch --device "$DEVICE" dev.kosuke.headway
+if ! xcrun devicectl device process launch --device "$DEVICE" dev.kosuke.headway; then
+  echo
+  echo "Installed, but it could not start. On the first install the iPhone must trust you as a developer:"
+  echo "  Settings > General > VPN & Device Management > your Apple ID > Trust."
+  echo "Then open Headway from the Home screen."
+fi
