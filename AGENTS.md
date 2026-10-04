@@ -75,8 +75,8 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Constraint: free stack only; no paid services. A free personal Apple ID is enough for installing on the user's own
   iPhone (re-signing every 7 days); the paid Developer Program is only needed to distribute (TestFlight, App Store).
 - Signing: the Mac utilities use one shared self-signed certificate (see `mac-utilities/AGENTS.md`); iOS rejects
-  self-signed certificates, so Headway uses the Apple Development certificate of the Personal Team `ZVUC9RT3QV`, kept
-  in the uncommitted `Config/Local.xcconfig`. `docs/run-on-iphone.md` has the steps and the TestFlight note.
+  self-signed certificates, so Headway uses the Apple Development certificate of the user's free Personal Team; the team
+  id is kept in the uncommitted `Config/Local.xcconfig`. `docs/run-on-iphone.md` has the steps and the TestFlight note.
 
 ## Plan
 

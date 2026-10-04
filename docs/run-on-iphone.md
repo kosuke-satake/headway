@@ -17,8 +17,8 @@ allow-list (like an API key restricted to certain origins: which app id, which d
   again, at most 3 such apps at a time, and no remote push notifications (local notifications are fine).
 
 State of this Mac (checked 2026-10-03, after a first mistaken check that filtered out untrusted identities): the login
-keychain has an "Apple Development: kosuke.satake@icloud.com" certificate (valid to 2027-09-05), and Xcode is signed in
-with a free Personal Team, `ZVUC9RT3QV`. That team id is in `Config/Local.xcconfig`, which is not committed.
+keychain has an Apple Development certificate, and Xcode is signed in with a free Personal Team. The team id is in
+`Config/Local.xcconfig`, which is not committed (the file is listed in `.gitignore`).
 
 The Mac apps in `~/Developer/Projects/Software/mac-utilities` use a different certificate on purpose: one shared
 self-signed "Mac Utilities Code Signing" certificate, so that macOS keeps privacy permissions across rebuilds (see that
