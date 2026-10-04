@@ -1,8 +1,9 @@
 import type { Env } from "./index";
 
 /**
- * One row per distinct snapshot of a feed. `payload` is the feed exactly as the city sent it (protobuf), gzipped when it
- * is large. Rows are deleted when the Mac has pulled them (see tools/pull_feeds.py) or after 14 days, whichever is first.
+ * One row per distinct snapshot of a feed. `payload` is the feed exactly as the city sent it (protobuf; `encoding` says
+ * "raw", or "gzip" for rows written by the first version). Rows are deleted when the Mac has pulled them (see
+ * tools/pull_feeds.py) or after 6 days, whichever is first.
  *
  * `state` holds small facts: the hash of the last snapshot of each feed (to skip repeats), when the last run happened,
  * and the last error.

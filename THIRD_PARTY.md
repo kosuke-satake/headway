@@ -1,7 +1,6 @@
 # Third-party material
 
-Headway's own code has no licence file yet (the author is still choosing one). The material below belongs to others and
-keeps its own terms.
+Headway's own code is under the MIT licence (`LICENSE`). The material below belongs to others and keeps its own terms.
 
 | What | Where | Licence |
 |---|---|---|

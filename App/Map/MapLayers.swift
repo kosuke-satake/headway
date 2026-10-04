@@ -51,13 +51,16 @@ final class MapLayers {
     self.style = style
     routeIDs = overlay.orderedRoutes.map(\.id)
 
-    // Route polylines: one per distinct shape, tagged with its route and direction.
+    // Route polylines: every shape per direction ("d", for a route on its own) and the merged lines with lanes ("o",
+    // for the whole network). A layer shows one kind or the other.
     var polylines: [MLNPolylineFeature] = []
-    for line in overlay.data.lines where line.latitudes.count > 1 {
-      var coordinates = zip(line.latitudes, line.longitudes).map { CLLocationCoordinate2D(latitude: $0, longitude: $1) }
-      let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
-      feature.attributes = ["route": line.route, "dir": line.direction, "lane": line.lane]
-      polylines.append(feature)
+    for (kind, set) in [("d", overlay.data.lines), ("o", overlay.data.overview)] {
+      for line in set where line.latitudes.count > 1 {
+        var coordinates = zip(line.latitudes, line.longitudes).map { CLLocationCoordinate2D(latitude: $0, longitude: $1) }
+        let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+        feature.attributes = ["route": line.route, "dir": line.direction, "lane": line.lane, "kind": kind]
+        polylines.append(feature)
+      }
     }
     routeSource = MLNShapeSource(identifier: "routes", features: polylines, options: nil)
     stopSource = MLNShapeSource(identifier: "stops", features: [], options: nil)
@@ -225,9 +228,14 @@ final class MapLayers {
       let focused = focus.routes.contains(id)
       // The route in focus is drawn thicker, and only in the chosen direction.
       let boost = focused ? 1.5 : 1.0
-      let predicate = focused && focus.direction != nil
-        ? NSPredicate(format: "route == %@ AND dir == %d", id, focus.direction!)
-        : NSPredicate(format: "route == %@", id)
+      let predicate: NSPredicate
+      if bundled {
+        predicate = NSPredicate(format: "route == %@ AND kind == 'o'", id)
+      } else if focused, let direction = focus.direction {
+        predicate = NSPredicate(format: "route == %@ AND kind == 'd' AND dir == %d", id, direction)
+      } else {
+        predicate = NSPredicate(format: "route == %@ AND kind == 'd'", id)
+      }
       line.predicate = predicate
       casing.predicate = predicate
       line.isVisible = look.visible
@@ -272,8 +280,8 @@ final class MapLayers {
     if focus.isActive {
       let routes = Array(focus.routes)
       arrowLayer.predicate = focus.direction != nil
-        ? NSPredicate(format: "route IN %@ AND dir == %d", routes, focus.direction!)
-        : NSPredicate(format: "route IN %@", routes)
+        ? NSPredicate(format: "route IN %@ AND kind == 'd' AND dir == %d", routes, focus.direction!)
+        : NSPredicate(format: "route IN %@ AND kind == 'd'", routes)
     }
     arrowLayer.iconImageName = NSExpression(forConstantValue: "route-arrow")
     arrowLayer.symbolPlacement = NSExpression(forConstantValue: "line")

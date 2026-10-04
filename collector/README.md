@@ -9,9 +9,11 @@ city feeds ──every minute──> Worker ──> D1 (small database) <──p
 
 - A cron trigger runs every minute. Each run looks at the vehicle feed three times (20 s apart, because the city rebuilds
   it every 30 s) and at the trip-update and alert feeds every 5 and 10 minutes. A snapshot is stored only when it differs
-  from the last one; large ones are gzipped.
+  from the last one, exactly as the city sent it. (Gzipping the 180 kB trip-update feed in the Worker took about 15 ms of
+  CPU, measured on 2026-10-04, more than the free plan's 10 ms; `tools/pull_feeds.py` gzips on the Mac instead.)
 - `tools/pull_feeds.py` fetches the snapshots, writes them in the layout `tools/record_feeds.py` uses (so `feedanalysis`
-  needs no changes) and then asks the collector to delete them. The collector also deletes anything older than 14 days.
+  needs no changes) and then asks the collector to delete them. The collector also deletes anything older than 6 days.
+  It skips snapshots that the Mac recorder already saved, so the two can overlap safely.
 - Nothing here is public except the front page. Every other route needs the secret token (`EXPORT_TOKEN`).
 
 ## What it costs
@@ -21,20 +23,23 @@ Nothing, on the free plans. Checked against Cloudflare's documentation on 2026-1
 | Limit (free) | Value | This collector |
 |---|---|---|
 | Worker requests | 100,000 / day | about 1,440 cron runs plus the Mac's pulls (a few thousand) |
-| CPU time per run | 10 ms (cron runs: 10 ms) | waiting for the city and the database is not CPU time; gzip of a 180 kB feed is the largest cost |
+| CPU time per run | 10 ms (cron runs: 10 ms) | 5-9 ms measured with `wrangler tail` (waiting for the city and the database is not CPU time) |
 | Cron triggers | 5 per account | 1 |
 | Cron run duration | 15 minutes | about 45 seconds |
 | D1 rows written | 100,000 / day | about 15,000 (estimate: each snapshot touches its row, an index entry and a state row, and old rows are deleted) |
 | D1 rows read | 5 million / day | a few thousand |
-| D1 size | 500 MB per database, 5 GB total | about 14 MB a day of snapshots, so 14 days is about 200 MB |
+| D1 size | 500 MB per database, 5 GB total | about 60 MB a day uncompressed; pulled every hour, so normally a few MB; at most 6 days (about 360 MB) if the Mac is away |
 
 When a daily limit is exceeded, Cloudflare's documentation says further operations fail with an error; it does not say you
 are charged. Pages Functions count against the same Workers request allowance, so a Pages site that uses Functions shares
 the 100,000 a day. The pages fetched did not say whether a card is needed for the free plan.
 
-Measured on 2026-10-03/04 from the Mac recorder: about 1,200 vehicle snapshots (1.5 MB), 240 trip snapshots (12 MB) and 65
-alert snapshots a day, all gzipped. The CPU time of gzip in Cloudflare's runtime has not been measured (the tests run
-locally), so the first days should be watched with `tools/pull_feeds.py --status` and the dashboard's error counts.
+Measured on 2026-10-03/04 from the Mac recorder: about 1,200 vehicle snapshots (1.5 MB gzipped), 240 trip snapshots
+(12 MB gzipped, about 45 MB as sent) and 65 alert snapshots a day. Watch the first days with `tools/pull_feeds.py
+--status` and the dashboard's error counts.
+
+Deployed on 2026-10-04 (`https://headway-collector.<account>.workers.dev`; the Mac's copy of the address and token is in
+`data/collector/config.json`). The Mac recorder was stopped the same day; the hourly pull job runs instead.
 
 ## Setup
 

@@ -3,7 +3,8 @@
  *
  * Every minute a cron trigger looks at the vehicle feed three times, and at the trip-update and alert feeds every 5 and 10
  * minutes. A snapshot is stored only when it differs from the last one. The Mac pulls the snapshots with
- * `tools/pull_feeds.py` and then asks for them to be deleted, so the database stays small (free D1 allows 500 MB).
+ * `tools/pull_feeds.py` (which gzips them) and then asks for them to be deleted, so the database stays small (free D1
+ * allows 500 MB).
  */
 
 import { ensureSchema } from "./schema";
@@ -21,9 +22,11 @@ export interface Env {
 export type Feed = "vehicles" | "trips" | "alerts";
 
 const FEED_BASE = "https://metromap.cityofmadison.com/gtfsrt";
-/** Snapshots larger than this are gzipped before they are stored. */
-const GZIP_ABOVE = 20_000;
-const KEEP_DAYS = 14;
+/**
+ * Snapshots are stored as they come. Gzipping the 180 kB trip-update feed took about 15 ms of CPU, more than the free
+ * plan's 10 ms a run, so the database holds more (about 60 MB a day) and keeps it for fewer days instead.
+ */
+const KEEP_DAYS = 6;
 
 export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -97,11 +100,9 @@ export async function snapshot(env: Env, feed: Feed): Promise<boolean> {
   const last = await env.DB.prepare("SELECT value FROM state WHERE key = ?").bind(`hash:${feed}`).first<{ value: string }>();
   if (last?.value === hash) return false;
 
-  const gzip = bytes.length > GZIP_ABOVE;
-  const payload = gzip ? await gzipped(bytes) : bytes;
   await env.DB.batch([
     env.DB.prepare("INSERT INTO snapshots (feed, ts, hash, encoding, bytes, payload) VALUES (?, ?, ?, ?, ?, ?)").bind(
-      feed, ts, hash, gzip ? "gzip" : "raw", payload.length, payload,
+      feed, ts, hash, "raw", bytes.length, bytes,
     ),
     env.DB.prepare("INSERT INTO state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(
       `hash:${feed}`, hash,
@@ -113,11 +114,6 @@ export async function snapshot(env: Env, feed: Feed): Promise<boolean> {
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function gzipped(bytes: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
 // MARK: Export

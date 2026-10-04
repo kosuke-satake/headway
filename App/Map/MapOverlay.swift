@@ -10,7 +10,7 @@ import HeadwayCore
 struct MapOverlayData: Codable, Equatable, Sendable {
   /// Raise this whenever what the overlay holds, or how it is computed (for example the bundling of lanes), changes: a
   /// saved copy of an older version is then ignored and rebuilt from the timetable.
-  static let currentVersion = 4
+  static let currentVersion = 5
 
   struct RouteInfo: Codable, Equatable, Sendable {
     var id: String
@@ -21,8 +21,9 @@ struct MapOverlayData: Codable, Equatable, Sendable {
     var sortOrder: Int
   }
 
-  /// A stretch of one route line in one direction, as parallel arrays of coordinates. `lane` is the sideways step at
-  /// which it is drawn so that routes sharing a street lie next to each other (0 when alone); see `RouteBundler`.
+  /// A route line as parallel arrays of coordinates. In `lines`, one shape in one direction, drawn on the street; in
+  /// `overview`, a stretch of the route's merged line (`direction` -1) with the `lane` at which it is drawn so that routes
+  /// sharing a street lie next to each other (0 when alone; see `RouteBundler`).
   struct Line: Codable, Equatable, Sendable {
     var route: String
     var direction: Int
@@ -42,14 +43,18 @@ struct MapOverlayData: Codable, Equatable, Sendable {
   var version = MapOverlayData.currentVersion
   var feedVersion: String
   var routes: [RouteInfo]
+  /// Each shape of each route, per direction: drawn when a route is looked at on its own.
   var lines: [Line]
+  /// One line per route with lanes: drawn for the whole network.
+  var overview: [Line] = []
   var stops: [StopInfo]
   var network: RouteNetwork
 
-  init(feedVersion: String, routes: [RouteInfo], lines: [Line], stops: [StopInfo], network: RouteNetwork) {
+  init(feedVersion: String, routes: [RouteInfo], lines: [Line], overview: [Line] = [], stops: [StopInfo], network: RouteNetwork) {
     self.feedVersion = feedVersion
     self.routes = routes
     self.lines = lines
+    self.overview = overview
     self.stops = stops
     self.network = network
   }
@@ -65,10 +70,13 @@ struct MapOverlayData: Codable, Equatable, Sendable {
       guard let trip = tripOfShape[shapeID], let route = schedule.routes[trip.routeID], points.count > 1 else { return nil }
       return BundleInput(route: route.id, order: route.sortOrder, direction: trip.directionID, shapeID: shapeID, points: points)
     }
-    lines = RouteBundler.bundle(inputs).map {
-      Line(route: $0.route, direction: $0.direction, lane: $0.lane, latitudes: $0.coordinates.map(\.latitude), longitudes: $0.coordinates.map(\.longitude))
+    lines = inputs.map {
+      Line(route: $0.route, direction: $0.direction, latitudes: $0.points.map(\.latitude), longitudes: $0.points.map(\.longitude))
     }
-    .sorted { ($0.route, $0.direction, $0.lane, $0.latitudes.first ?? 0) < ($1.route, $1.direction, $1.lane, $1.latitudes.first ?? 0) }
+    .sorted { ($0.route, $0.direction, $0.latitudes.count) < ($1.route, $1.direction, $1.latitudes.count) }
+    overview = RouteBundler.overview(inputs).map {
+      Line(route: $0.route, direction: -1, lane: $0.lane, latitudes: $0.coordinates.map(\.latitude), longitudes: $0.coordinates.map(\.longitude))
+    }
     stops = schedule.stops.values.sorted { $0.id < $1.id }.map {
       StopInfo(id: $0.id, name: $0.name, code: $0.code, latitude: $0.latitude, longitude: $0.longitude)
     }

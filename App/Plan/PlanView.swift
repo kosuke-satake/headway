@@ -30,12 +30,13 @@ struct PlanView: View {
   @State private var showOptions = false
   @State private var showSavedPlaces = false
   @State private var showAllRecents = false
+  @State private var path: [Journey] = []
   @State private var mode: DepartMode = .now
   @State private var date = Date().addingTimeInterval(900)
 
   var body: some View {
     let plan = model.plan
-    NavigationStack {
+    NavigationStack(path: $path) {
       List {
         savedPlaces
         savedTrips
@@ -56,6 +57,7 @@ struct PlanView: View {
         }
       }
       .navigationDestination(for: Journey.self) { JourneyDetailView(journey: $0) }
+      .onChange(of: path.count) { _, count in model.planPushed = count > 0 }
       .sheet(item: $picking) { target in
         PlacePicker(allowsMyLocation: target == .from || target == .to, title: title(for: target)) { choice in
           apply(choice, to: target)

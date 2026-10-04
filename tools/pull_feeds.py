@@ -56,12 +56,29 @@ class Collector:
         return json.loads(self.request(path, method)[0])
 
 
+def same_snapshot_nearby(folder: Path, feed: str, moment: datetime, raw: bytes) -> bool:
+    """True when the same feed with the same content is already saved within 90 seconds (for example by the Mac
+    recorder, while both ran)."""
+    if not folder.exists():
+        return False
+    for path in folder.glob(f"*_{feed}.pb.gz"):
+        try:
+            stamp = datetime.strptime(path.name.split("_")[0], "%Y%m%dT%H%M%S%z")
+        except ValueError:
+            continue
+        if abs((stamp - moment).total_seconds()) <= 90 and gzip.decompress(path.read_bytes()) == raw:
+            return True
+    return False
+
+
 def write_snapshot(root: Path, feed: str, ts_ms: int, encoding: str, body: bytes) -> bool:
     """Saves one snapshot. Returns False when the same snapshot is already on disk (a repeated pull)."""
     raw = gzip.decompress(body) if encoding == "gzip" else body
-    # Compress again here so that the files are byte-for-byte what record_feeds.py writes, whatever the collector used.
+    # Compress here, so that the files are byte-for-byte what record_feeds.py writes, whatever the collector stored.
     packed = gzip.compress(raw)
     moment = datetime.fromtimestamp(ts_ms / 1000).astimezone()
+    if same_snapshot_nearby(root / moment.strftime("%Y-%m-%d"), feed, moment, raw):
+        return False
     while True:
         folder = root / moment.strftime("%Y-%m-%d")
         target = folder / f"{moment.strftime('%Y%m%dT%H%M%S%z')}_{feed}.pb.gz"

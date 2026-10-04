@@ -6,7 +6,6 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gunzipSync } from "node:zlib";
 import { after, before, test } from "node:test";
 
 const TOKEN = "test-token";
@@ -109,7 +108,7 @@ test("a minute with nothing slow stores the vehicles once, however often they ar
   assert.equal(items[0].encoding, "raw");
 });
 
-test("trips every 5 minutes and alerts every 10; large snapshots are gzipped and come back intact", async () => {
+test("trips every 5 minutes and alerts every 10; snapshots come back exactly as the city sent them", async () => {
   await run(5);
   assert.deepEqual((await list()).map((item) => item.feed), ["vehicles", "trips"]);
   await run(10);
@@ -117,13 +116,13 @@ test("trips every 5 minutes and alerts every 10; large snapshots are gzipped and
   assert.deepEqual(items.map((item) => item.feed), ["vehicles", "trips", "alerts"]);
 
   const trips = items.find((item) => item.feed === "trips");
-  assert.equal(trips.encoding, "gzip");
-  assert.ok(trips.bytes < 1_000, "60 kB of one byte value should compress to almost nothing");
+  assert.equal(trips.encoding, "raw");
+  assert.equal(trips.bytes, feeds.trips.length);
   const response = await get(`/snapshot/${trips.id}`);
-  assert.equal(response.headers.get("X-Encoding"), "gzip");
+  assert.equal(response.headers.get("X-Encoding"), "raw");
   assert.equal(response.headers.get("X-Feed"), "trips");
   assert.ok(Number(response.headers.get("X-Timestamp")) > 0);
-  assert.deepEqual(gunzipSync(Buffer.from(await response.arrayBuffer())), feeds.trips);
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), feeds.trips);
 
   const vehicles = items.find((item) => item.feed === "vehicles");
   const raw = await get(`/snapshot/${vehicles.id}`);

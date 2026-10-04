@@ -6,14 +6,11 @@ struct RootView: View {
 
   /// Height of the stop and bus sheets in their resting position.
   private static let detailHeight: CGFloat = 320
-  /// The smallest position of the journey sheet: just its header, so the map is nearly free and the sheet is still
-  /// there to pull back up.
-  private static let peekHeight: CGFloat = 128
 
   var body: some View {
     @Bindable var model = model
     ZStack(alignment: .top) {
-      MapContainer(bottomInset: model.sheet?.isDetail == true ? (model.sheet == .journey ? Self.peekHeight : Self.detailHeight) : 0)
+      MapContainer(bottomInset: model.sheet?.isDetail == true ? Self.detailHeight : 0)
         .ignoresSafeArea()
         .accessibilityHidden(model.mode != .map)
       if model.mode == .map {
@@ -50,6 +47,9 @@ struct RootView: View {
       if model.mode == .plan {
         PlanView().background(Color(.systemGroupedBackground).ignoresSafeArea())
       }
+      if !model.menuOpen, model.mode == .map || !model.planPushed {
+        EdgeSwipeArea()
+      }
       MenuDrawer()
     }
     .sheet(item: $model.sheet) { sheet in
@@ -59,7 +59,8 @@ struct RootView: View {
       case .bus(let id):
         BusSheet(vehicleID: id).modifier(DetailSheetStyle(height: Self.detailHeight))
       case .journey:
-        JourneySheet().modifier(DetailSheetStyle(height: Self.detailHeight, peek: Self.peekHeight))
+        // Dragged all the way down, the journey goes into the bar at the bottom of the map.
+        JourneySheet().modifier(DetailSheetStyle(height: Self.detailHeight))
       case .settings:
         // Half height with the map still usable, so a change (colours, marker size) can be watched on the map.
         SettingsView()
@@ -103,13 +104,10 @@ struct RootView: View {
 /// A bottom sheet that leaves the map usable above it.
 private struct DetailSheetStyle: ViewModifier {
   let height: CGFloat
-  /// When set, the sheet can be lowered to this height but not swiped away.
-  var peek: CGFloat?
 
   func body(content: Content) -> some View {
     content
-      .presentationDetents(peek.map { [.height($0), .height(height), .large] } ?? [.height(height), .large])
-      .interactiveDismissDisabled(peek != nil)
+      .presentationDetents([.height(height), .large])
       .presentationBackgroundInteraction(.enabled(upThrough: .height(height)))
       .presentationDragIndicator(.visible)
       .presentationContentInteraction(.scrolls)
@@ -163,6 +161,29 @@ private struct StatusPill: View {
 }
 
 /// Says what the map is limited to, and lets the rider change the direction or go back to all routes.
+/// A thin strip along the left edge: swiping right from it opens the menu, like the hamburger button.
+private struct EdgeSwipeArea: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    Color.clear
+      .frame(width: 16)
+      .frame(maxHeight: .infinity)
+      .contentShape(Rectangle())
+      .gesture(
+        DragGesture(minimumDistance: 10)
+          .onEnded { value in
+            if value.translation.width > 50, abs(value.translation.height) < value.translation.width {
+              withAnimation(.snappy(duration: 0.28)) { model.menuOpen = true }
+            }
+          }
+      )
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .ignoresSafeArea()
+      .accessibilityHidden(true)
+  }
+}
+
 /// The journey drawn on the map, as a bar at the bottom: tap it to bring the steps back, or close the journey.
 private struct JourneyBar: View {
   @Environment(AppModel.self) private var model
@@ -193,6 +214,8 @@ private struct JourneyBar: View {
       .padding(.horizontal, 14)
       .padding(.vertical, 4)
       .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      // Swiping the bar up brings the steps back, like pulling up a sheet.
+      .gesture(DragGesture(minimumDistance: 10).onEnded { if $0.translation.height < -30 { model.sheet = .journey } })
     }
   }
 }

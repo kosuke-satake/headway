@@ -108,7 +108,13 @@ final class AppModel {
       restartPolling()  // predictions are needed in every mode but the plain map
     }
   }
-  var menuOpen = false
+  /// The side menu. A sheet is drawn above everything else, so opening the menu puts the sheet away first (a journey
+  /// then waits in the bar at the bottom of the map).
+  var menuOpen = false {
+    didSet { if menuOpen, !oldValue, sheet != nil { sheet = nil } }
+  }
+  /// True while the planner shows a pushed screen (a journey's details): the edge swipe then goes back, not to the menu.
+  var planPushed = false
   /// A place the rider long-pressed on the map, waiting for them to say what to do with it.
   var droppedPin: PlanPoint?
   /// The journey drawn on the map, with the lines to draw.
