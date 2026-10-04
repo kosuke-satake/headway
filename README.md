@@ -3,6 +3,9 @@
 A fast, live bus map for Madison, WI (Metro Transit): every route and stop on an offline map, buses moving in real
 time, and the next arrivals at any stop. English UI with a Japanese localization.
 
+Headway is an independent project. It is not made, endorsed or supported by the City of Madison or Metro Transit; it uses
+the data the city publishes (see Data below), and bus times can differ from what the buses do.
+
 ## Features
 
 - **Offline map.** The Madison-area basemap is stored in the app; only the live bus positions need a connection
