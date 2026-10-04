@@ -109,24 +109,24 @@ final class AppSettings {
     }
   }
 
-  func isSaved(from: PlaceChoice, to: PlaceChoice) -> Bool {
+  func isSaved(from: PlaceChoice, to: PlaceChoice, vias: [StoredVia] = []) -> Bool {
     let f = StoredEnd(from), t = StoredEnd(to)
-    return values.savedTrips.contains { $0.matches(from: f, to: t) }
+    return values.savedTrips.contains { $0.matches(from: f, to: t, vias: vias) }
   }
 
-  func toggleSaved(from: PlaceChoice, to: PlaceChoice) {
+  func toggleSaved(from: PlaceChoice, to: PlaceChoice, vias: [StoredVia] = []) {
     let f = StoredEnd(from), t = StoredEnd(to)
-    if let index = values.savedTrips.firstIndex(where: { $0.matches(from: f, to: t) }) {
+    if let index = values.savedTrips.firstIndex(where: { $0.matches(from: f, to: t, vias: vias) }) {
       values.savedTrips.remove(at: index)
     } else {
-      values.savedTrips.append(SavedTrip(from: f, to: t))
+      values.savedTrips.append(SavedTrip(from: f, to: t, vias: vias))
     }
   }
 
-  func noteRecent(from: PlaceChoice, to: PlaceChoice) {
+  func noteRecent(from: PlaceChoice, to: PlaceChoice, vias: [StoredVia] = []) {
     let f = StoredEnd(from), t = StoredEnd(to)
-    var recents = values.recentTrips.filter { !$0.matches(from: f, to: t) }
-    recents.insert(SavedTrip(from: f, to: t), at: 0)
-    values.recentTrips = Array(recents.prefix(10))
+    var recents = values.recentTrips.filter { !$0.matches(from: f, to: t, vias: vias) }
+    recents.insert(SavedTrip(from: f, to: t, vias: vias), at: 0)
+    values.recentTrips = Array(recents.prefix(30))
   }
 }

@@ -81,6 +81,24 @@ public enum JourneyLeg: Sendable, Hashable {
   }
 }
 
+/// A place the rider stops at on the way, for a while, before going on (a trip with several destinations).
+public struct Stopover: Sendable, Hashable {
+  public let place: PlanPoint
+  public let arrive: Date
+  public let leave: Date
+  /// The stopover comes after the leg at this index.
+  public let afterLeg: Int
+
+  public init(place: PlanPoint, arrive: Date, leave: Date, afterLeg: Int) {
+    self.place = place
+    self.arrive = arrive
+    self.leave = leave
+    self.afterLeg = afterLeg
+  }
+
+  public var duration: TimeInterval { leave.timeIntervalSince(arrive) }
+}
+
 public struct Journey: Sendable, Identifiable, Hashable {
   public var id: String {
     legs.compactMap { if case .ride(let ride) = $0 { return "\(ride.tripID)@\(ride.fromStop.stopID ?? "")" } else { return nil } }
@@ -88,8 +106,13 @@ public struct Journey: Sendable, Identifiable, Hashable {
   }
 
   public let legs: [JourneyLeg]
+  /// Places stopped at between the legs; empty for an ordinary journey.
+  public let stopovers: [Stopover]
 
-  public init(legs: [JourneyLeg]) { self.legs = legs }
+  public init(legs: [JourneyLeg], stopovers: [Stopover] = []) {
+    self.legs = legs
+    self.stopovers = stopovers
+  }
 
   public var departure: Date { legs.first?.start ?? .distantPast }
   public var arrival: Date { legs.last?.end ?? .distantPast }
@@ -115,7 +138,9 @@ public struct Journey: Sendable, Identifiable, Hashable {
   public var transferBuffers: [TimeInterval] {
     var buffers: [TimeInterval] = []
     var lastArrival: Date?
-    for leg in legs {
+    for (index, leg) in legs.enumerated() {
+      // A stopover is a stay, not a connection: it does not count as a transfer buffer.
+      defer { if stopovers.contains(where: { $0.afterLeg == index }) { lastArrival = nil } }
       switch leg {
       case .ride(let ride):
         if let lastArrival { buffers.append(ride.depart.timeIntervalSince(lastArrival)) }

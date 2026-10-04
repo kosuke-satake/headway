@@ -19,6 +19,8 @@ struct MapFocus: Equatable {
   var label: String?
   /// True when the focus came from a bus being opened; closing the bus then clears it.
   var fromBus = false
+  /// True when the focus shows an alert (so the chip explains the dashed line).
+  var isAlert = false
 
   var isActive: Bool { !routes.isEmpty }
 

@@ -1,9 +1,21 @@
 import HeadwayCore
 import SwiftUI
 
-private enum PickTarget: String, Identifiable {
+private enum PickTarget: Identifiable, Equatable {
   case from, to, home, work, place
-  var id: String { rawValue }
+  /// A stop on the way (identified by the stop's id in `PlanModel.vias`).
+  case via(UUID)
+
+  var id: String {
+    switch self {
+    case .from: "from"
+    case .to: "to"
+    case .home: "home"
+    case .work: "work"
+    case .place: "place"
+    case .via(let id): "via-\(id)"
+    }
+  }
 }
 
 private enum DepartMode: String, CaseIterable, Identifiable {
@@ -17,6 +29,7 @@ struct PlanView: View {
   @State private var picking: PickTarget?
   @State private var showOptions = false
   @State private var showSavedPlaces = false
+  @State private var showAllRecents = false
   @State private var mode: DepartMode = .now
   @State private var date = Date().addingTimeInterval(900)
 
@@ -25,6 +38,7 @@ struct PlanView: View {
     NavigationStack {
       List {
         savedPlaces
+        savedTrips
         Section {
           placeRows(plan)
           departureRow(plan)
@@ -72,6 +86,7 @@ struct PlanView: View {
     case .home: "Home"
     case .work: "Work"
     case .place: "Save a place"
+    case .via: "Stop on the way"
     }
   }
 
@@ -80,6 +95,10 @@ struct PlanView: View {
     switch target {
     case .from, .to:
       if target == .from { plan.from = choice } else { plan.to = choice }
+      plan.clearResults()
+      if plan.canSearch { Task { await model.searchJourneys() } }
+    case .via(let id):
+      if let index = plan.vias.firstIndex(where: { $0.id == id }) { plan.vias[index].place = choice }
       plan.clearResults()
       if plan.canSearch { Task { await model.searchJourneys() } }
     case .home, .work, .place:
@@ -157,29 +176,75 @@ struct PlanView: View {
   // MARK: Inputs
 
   private func placeRows(_ plan: PlanModel) -> some View {
-    HStack(alignment: .center, spacing: 12) {
-      VStack(spacing: 4) {
-        Image(systemName: "circle.fill").font(.system(size: 9)).foregroundStyle(.blue)
-        ForEach(0..<3, id: \.self) { _ in Circle().fill(.secondary.opacity(0.5)).frame(width: 3, height: 3) }
-        Image(systemName: "mappin.circle.fill").font(.system(size: 16)).foregroundStyle(.red)
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .center, spacing: 12) {
+        VStack(spacing: 0) {
+          HStack(spacing: 12) {
+            Image(systemName: "circle.fill").font(.system(size: 9)).foregroundStyle(.blue).frame(width: 16)
+            placeButton(title: "From", choice: plan.from) { picking = .from }
+          }
+          ForEach(plan.vias) { via in
+            Divider().padding(.leading, 28)
+            viaRow(via, plan: plan)
+          }
+          Divider().padding(.leading, 28)
+          HStack(spacing: 12) {
+            Image(systemName: "mappin.circle.fill").font(.system(size: 16)).foregroundStyle(.red).frame(width: 16)
+            placeButton(title: "To", choice: plan.to) { picking = .to }
+          }
+        }
+        Button {
+          plan.swap()
+          plan.clearResults()
+          if plan.canSearch { Task { await model.searchJourneys() } }
+        } label: {
+          Image(systemName: "arrow.up.arrow.down").font(.body.weight(.semibold)).frame(width: 38, height: 38)
+        }
+        .buttonStyle(.bordered)
+        .clipShape(Circle())
+        .accessibilityLabel(Text("Swap start and destination"))
       }
-      VStack(spacing: 0) {
-        placeButton(title: "From", choice: plan.from) { picking = .from }
-        Divider()
-        placeButton(title: "To", choice: plan.to) { picking = .to }
+      if plan.vias.count < PlanModel.maxVias {
+        Button {
+          plan.addVia()
+          plan.clearResults()
+        } label: {
+          Label("Add a stop", systemImage: "plus.circle").font(.subheadline)
+        }
+        .buttonStyle(.borderless)
+        .padding(.leading, 28)
       }
-      Button {
-        plan.swap()
-        plan.clearResults()
-        if plan.canSearch { Task { await model.searchJourneys() } }
-      } label: {
-        Image(systemName: "arrow.up.arrow.down").font(.body.weight(.semibold)).frame(width: 38, height: 38)
-      }
-      .buttonStyle(.bordered)
-      .clipShape(Circle())
-      .accessibilityLabel(Text("Swap start and destination"))
     }
     .padding(.vertical, 4)
+  }
+
+  /// A stop on the way: where, how long to stay, and a button to take it out.
+  private func viaRow(_ via: PlanVia, plan: PlanModel) -> some View {
+    HStack(spacing: 12) {
+      Image(systemName: "circle").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary).frame(width: 16)
+      VStack(alignment: .leading, spacing: 0) {
+        placeButton(title: "Stop on the way", choice: via.place) { picking = .via(via.id) }
+        Menu {
+          ForEach(PlanVia.dwellChoices, id: \.self) { minutes in
+            Button(TimeText.minutesLabel(minutes)) {
+              if let index = plan.vias.firstIndex(where: { $0.id == via.id }) { plan.vias[index].dwellMinutes = minutes }
+              plan.clearResults()
+            }
+          }
+        } label: {
+          Label("Stay \(TimeText.minutesLabel(via.dwellMinutes))", systemImage: "clock").font(.caption)
+        }
+        .padding(.bottom, 6)
+      }
+      Button {
+        plan.removeVia(via.id)
+        plan.clearResults()
+      } label: {
+        Image(systemName: "minus.circle.fill").foregroundStyle(.secondary).font(.title3)
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel(Text("Remove this stop"))
+    }
   }
 
   private func placeButton(title: LocalizedStringKey, choice: PlaceChoice?, action: @escaping () -> Void) -> some View {
@@ -256,9 +321,9 @@ struct PlanView: View {
       .buttonStyle(.borderedProminent)
       .disabled(!plan.canSearch || plan.phase == .searching)
 
-      if let from = plan.from, let to = plan.to {
-        let saved = model.settings.isSaved(from: from, to: to)
-        Button { model.settings.toggleSaved(from: from, to: to) } label: {
+      if let from = plan.from, let to = plan.to, plan.canSearch {
+        let saved = model.settings.isSaved(from: from, to: to, vias: plan.storedVias)
+        Button { model.settings.toggleSaved(from: from, to: to, vias: plan.storedVias) } label: {
           Image(systemName: saved ? "star.fill" : "star").font(.title3).foregroundStyle(saved ? Color.orange : .secondary).frame(width: 40, height: 36)
         }
         .buttonStyle(.bordered)
@@ -283,15 +348,9 @@ struct PlanView: View {
     }
   }
 
-  @ViewBuilder private func shortcuts(_ plan: PlanModel) -> some View {
+  /// Trips kept with the star, right under the saved places so that they are one tap away.
+  @ViewBuilder private var savedTrips: some View {
     let saved = model.settings.values.savedTrips
-    let recents = model.settings.values.recentTrips.filter { recent in !saved.contains { $0.matches(from: recent.from, to: recent.to) } }
-    if saved.isEmpty, recents.isEmpty {
-      Section {
-        Text("Choose where you are going. Journeys take live delays into account for buses that are reporting.")
-          .font(.footnote).foregroundStyle(.secondary)
-      }
-    }
     if !saved.isEmpty {
       Section("Saved trips") {
         ForEach(saved) { trip in tripRow(trip, symbol: "star.fill", tint: .orange) }
@@ -299,9 +358,26 @@ struct PlanView: View {
           .onMove { model.settings.values.savedTrips.move(fromOffsets: $0, toOffset: $1) }
       }
     }
+  }
+
+  @ViewBuilder private func shortcuts(_ plan: PlanModel) -> some View {
+    let saved = model.settings.values.savedTrips
+    let recents = model.settings.values.recentTrips.filter { recent in
+      !saved.contains { $0.matches(from: recent.from, to: recent.to, vias: recent.stops) }
+    }
+    if saved.isEmpty, recents.isEmpty {
+      Section {
+        Text("Choose where you are going. Journeys take live delays into account for buses that are reporting.")
+          .font(.footnote).foregroundStyle(.secondary)
+      }
+    }
     if !recents.isEmpty {
       Section("Recent trips") {
-        ForEach(recents.prefix(5)) { trip in tripRow(trip, symbol: "clock.arrow.circlepath", tint: .secondary) }
+        ForEach(showAllRecents ? recents : Array(recents.prefix(8))) { trip in tripRow(trip, symbol: "clock.arrow.circlepath", tint: .secondary) }
+        if recents.count > 8 {
+          Button(showAllRecents ? "Show fewer" : "Show all \(recents.count)") { withAnimation { showAllRecents.toggle() } }
+            .font(.footnote)
+        }
       }
     }
   }
@@ -311,13 +387,14 @@ struct PlanView: View {
       let plan = model.plan
       plan.from = trip.from.choice
       plan.to = trip.to.choice
+      plan.vias = trip.stops.map { PlanVia(place: $0.end.choice, dwellMinutes: $0.dwellMinutes) }
       plan.clearResults()
       model.location.start()
       Task { await model.searchJourneys() }
     } label: {
       HStack(spacing: 12) {
         Image(systemName: symbol).foregroundStyle(tint).frame(width: 24)
-        Text(trip.title).foregroundStyle(.primary).lineLimit(1)
+        Text(trip.title).foregroundStyle(.primary).lineLimit(2)
         Spacer(minLength: 0)
       }
       .contentShape(Rectangle())
@@ -417,7 +494,13 @@ struct JourneyCard: View {
       }
       HStack(spacing: 6) {
         ForEach(Array(journey.legs.enumerated()), id: \.offset) { index, leg in
-          if index > 0 { Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(.tertiary) }
+          if index > 0 {
+            if journey.stopovers.contains(where: { $0.afterLeg == index - 1 }) {
+              Image(systemName: "mappin.circle.fill").font(.caption).foregroundStyle(.purple)
+            } else {
+              Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(.tertiary)
+            }
+          }
           switch leg {
           case .walk(let walk):
             HStack(spacing: 2) {
@@ -429,6 +512,9 @@ struct JourneyCard: View {
             RouteBadge(routeID: ride.routeID, compact: true)
           }
         }
+      }
+      if !journey.stopovers.isEmpty {
+        Text("Stops: \(journey.stopovers.map(\.place.name).joined(separator: ", "))").font(.caption).foregroundStyle(.purple)
       }
       HStack(spacing: 10) {
         Text(journey.transfers == 0 ? String(localized: "Direct") : String(localized: "\(journey.transfers) transfers"))
@@ -568,6 +654,15 @@ struct JourneySteps: View {
             }
           }
         }
+        if let stay = journey.stopovers.first(where: { $0.afterLeg == index }) {
+          StepRow(symbol: "mappin.circle.fill", tint: .purple) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Stay at \(stay.place.name)").font(.subheadline.weight(.semibold))
+              Text("\(text.clock(stay.arrive))–\(text.clock(stay.leave)) · \(TimeText.duration(stay.duration))")
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+          }
+        }
       }
     }
     .padding(.vertical, 4)
@@ -589,7 +684,9 @@ struct JourneySteps: View {
   private func buffer(before index: Int) -> TimeInterval? {
     guard case .ride(let next) = journey.legs[index] else { return nil }
     let previousEnd = journey.legs[index - 1].end
-    guard journey.legs[..<index].contains(where: { if case .ride = $0 { return true } else { return false } }) else { return nil }
+    // A stay on the way is not a connection: only rides since the last stay count.
+    let from = (journey.stopovers.map(\.afterLeg).filter { $0 < index }.max() ?? -1) + 1
+    guard from < index, journey.legs[from..<index].contains(where: { if case .ride = $0 { return true } else { return false } }) else { return nil }
     return next.depart.timeIntervalSince(previousEnd)
   }
 }

@@ -65,15 +65,37 @@ struct StoredEnd: Codable, Hashable {
   }
 }
 
+/// A place stopped at on the way, and for how long.
+struct StoredVia: Codable, Hashable {
+  var end: StoredEnd
+  var dwellMinutes: Int
+
+  func matches(_ other: StoredVia) -> Bool { end.matches(other.end) && dwellMinutes == other.dwellMinutes }
+}
+
 /// A trip the rider keeps, or searched recently.
 struct SavedTrip: Codable, Hashable, Identifiable {
   var id: String = UUID().uuidString
   var from: StoredEnd
   var to: StoredEnd
+  /// Places stopped at between the start and the destination; nil (absent in older saves) for an ordinary trip.
+  var vias: [StoredVia]?
   var date: Date = Date()
 
-  var title: String { "\(from.title) → \(to.title)" }
-  func matches(from f: StoredEnd, to t: StoredEnd) -> Bool { from.matches(f) && to.matches(t) }
+  init(from: StoredEnd, to: StoredEnd, vias: [StoredVia] = []) {
+    self.from = from
+    self.to = to
+    self.vias = vias.isEmpty ? nil : vias
+  }
+
+  var stops: [StoredVia] { vias ?? [] }
+
+  var title: String { ([from.title] + stops.map(\.end.title) + [to.title]).joined(separator: " → ") }
+
+  func matches(from f: StoredEnd, to t: StoredEnd, vias v: [StoredVia] = []) -> Bool {
+    guard from.matches(f), to.matches(t), stops.count == v.count else { return false }
+    return zip(stops, v).allSatisfy { $0.matches($1) }
+  }
 }
 
 enum WalkSpeed: String, Codable, CaseIterable, Identifiable {

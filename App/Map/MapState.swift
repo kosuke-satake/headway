@@ -9,6 +9,7 @@ struct MapPreferences: Equatable {
   var showRouteNameOnBuses = true
   var routeLineWidth = 1.0
   var focusStyle: FocusStyle = .hide
+  var focusFade = 0.08
   var stopVisibility: StopVisibility = .zoomed
   var showStopNames = true
   var smoothBusMovement = true
@@ -24,6 +25,7 @@ struct MapPreferences: Equatable {
     showRouteNameOnBuses = p.showRouteNameOnBuses
     routeLineWidth = p.routeLineWidth
     focusStyle = p.focusStyle
+    focusFade = p.focusFade
     stopVisibility = p.stopVisibility
     showStopNames = p.showStopNames
     smoothBusMovement = p.smoothBusMovement
@@ -93,7 +95,7 @@ struct RouteLook {
       fill: line,
       busFill: bus,
       busText: RouteColors.text(on: bus),
-      opacity: state.journeyID != nil ? 0.2 : (anyFocus && !isFocused ? 0.15 : 1),
+      opacity: state.journeyID != nil || (anyFocus && !isFocused) ? prefs.focusFade : 1,
       // A route the rider asked to look at is shown even when they hide it in general. While a journey is shown, the
       // routes give way to it (hidden or faded, as in Settings).
       visible: state.journeyID != nil

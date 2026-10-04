@@ -45,6 +45,18 @@ struct SettingsView: View {
             Text("Hide them").tag(FocusStyle.hide)
             Text("Fade them").tag(FocusStyle.dim)
           }
+          if settings.values.focusStyle == .dim {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("How faint the faded routes are")
+              Slider(value: $settings.values.focusFade, in: 0.02...0.3, step: 0.02)
+                .accessibilityLabel(Text("How faint the faded routes are"))
+              HStack {
+                Text("Fainter").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text("Clearer").font(.caption).foregroundStyle(.secondary)
+              }
+            }
+          }
           Picker("Bus stops", selection: $settings.values.stopVisibility) {
             Text("When zoomed in").tag(StopVisibility.zoomed)
             Text("Always").tag(StopVisibility.always)

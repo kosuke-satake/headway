@@ -374,7 +374,8 @@ public struct TripPlanner: Sendable {
 
   private func walkOnlyJourney(from origin: PlanPoint, to destination: PlanPoint, start: Date, options: PlanOptions) -> Journey? {
     let meters = Geometry.distance(from: origin.coordinate, to: destination.coordinate)
-    guard meters > 0, meters <= 1200 else { return nil }
+    // Walking the whole way is offered up to one and a half times the longest walk the rider accepts to a stop.
+    guard meters > 0, meters <= options.maxWalkMeters * 1.5 else { return nil }
     let seconds = meters * options.walkDetourFactor / options.walkSpeed
     let leg = WalkLeg(from: origin, to: destination, start: start, end: start.addingTimeInterval(seconds), meters: meters)
     return Journey(legs: [.walk(leg)])

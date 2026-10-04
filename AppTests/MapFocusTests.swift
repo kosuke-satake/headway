@@ -13,7 +13,7 @@ import UIKit
     ]
     let lines = [
       MapOverlayData.Line(route: "A", direction: 0, latitudes: [43.0, 43.1, 43.2], longitudes: [-89.5, -89.4, -89.3]),
-      MapOverlayData.Line(route: "A", direction: 1, latitudes: [43.2, 43.0], longitudes: [-89.3, -89.5]),
+      MapOverlayData.Line(route: "A", direction: 1, lane: 0.5, latitudes: [43.2, 43.0], longitudes: [-89.3, -89.5]),
       MapOverlayData.Line(route: "B", direction: 0, latitudes: [44.0, 44.1], longitudes: [-90.0, -90.1]),
     ]
     let stops = [MapOverlayData.StopInfo(id: "s1", name: "First", code: "1001", latitude: 43.0, longitude: -89.5)]

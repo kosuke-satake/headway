@@ -3771,6 +3771,262 @@
           }
         }
       }
+    },
+    "%lld buses now": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いま%lld台"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld bus now"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld buses now"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "No buses right now": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いまはバスがいません"
+          }
+        }
+      }
+    },
+    "Not running today": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日は運行なし"
+          }
+        }
+      }
+    },
+    "next %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次は%@"
+          }
+        }
+      }
+    },
+    "A trip is scheduled but no bus is reporting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行予定ですが、位置を送信しているバスがありません"
+          }
+        }
+      }
+    },
+    "only %lld trips today": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日は%lld便だけ"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "only %lld trip today"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "only %lld trips today"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Which route?": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "どの路線ですか？"
+          }
+        }
+      }
+    },
+    "How faint the faded routes are": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "薄く表示する路線の濃さ"
+          }
+        }
+      }
+    },
+    "Fainter": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "より薄く"
+          }
+        }
+      }
+    },
+    "Clearer": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "より濃く"
+          }
+        }
+      }
+    },
+    "Dashed line: the route has an alert. The city does not publish which streets a detour uses; see the details link.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "破線は、その路線に警報が出ていることを表します。迂回がどの道を通るかは市が公開していないため、地図では示せません（詳細リンクをご覧ください）。"
+          }
+        }
+      }
+    },
+    "Choose a place for each stop on the way.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "途中の立ち寄り先をすべて選んでください。"
+          }
+        }
+      }
+    },
+    "Stay at %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ で滞在"
+          }
+        }
+      }
+    },
+    "Stop on the way": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "途中の立ち寄り先"
+          }
+        }
+      }
+    },
+    "Add a stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立ち寄り先を追加"
+          }
+        }
+      }
+    },
+    "Stay %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "滞在 %@"
+          }
+        }
+      }
+    },
+    "Remove this stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この立ち寄り先を削除"
+          }
+        }
+      }
+    },
+    "Stops: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立ち寄り: %@"
+          }
+        }
+      }
+    },
+    "Show fewer": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示を減らす"
+          }
+        }
+      }
+    },
+    "Show all %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべて表示（%lld件）"
+          }
+        }
+      }
     }
   }
 }

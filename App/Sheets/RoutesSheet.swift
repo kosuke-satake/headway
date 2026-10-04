@@ -23,6 +23,7 @@ struct RoutesSheet: View {
       }
       .navigationTitle("Routes")
       .navigationBarTitleDisplayMode(.inline)
+      .onAppear { model.refreshOutlooks() }
       .notificationsDeniedAlert()
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
@@ -34,6 +35,15 @@ struct RoutesSheet: View {
         ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
       }
     }
+  }
+
+  /// How many buses are running, or why there are none: nothing here is an error.
+  private func statusLine(route: String, direction: Int?) -> some View {
+    let status = model.liveStatus(route: route, direction: direction)
+    return Text(status.text)
+      .font(.caption)
+      .foregroundStyle(status.isRunning ? Color.green : Color.secondary)
+      .fixedSize(horizontal: false, vertical: true)
   }
 
   /// One route: a header that shows both directions, and one line per direction (they often use different streets).
@@ -54,6 +64,7 @@ struct RoutesSheet: View {
                 Text(route.longName.isEmpty ? String(localized: "Both directions") : route.longName).font(.subheadline).lineLimit(2)
                 if model.isWatching(route: route.id) { Image(systemName: "bell.fill").font(.caption2).foregroundStyle(.orange) }
               }
+              statusLine(route: route.id, direction: nil)
               if let match = model.reliability(route: route.id, stop: nil) {
                 Text("Usually \(Int((match.cell.onTimeShare * 100).rounded()))% on time right now").font(.caption).foregroundStyle(.secondary)
               }
@@ -72,14 +83,17 @@ struct RoutesSheet: View {
             model.focusRoute(route.id, direction: variant.direction)
             dismiss()
           } label: {
-            Label(model.directionTitle(route: route.id, direction: variant.direction), systemImage: model.directionSymbol(route: route.id, direction: variant.direction))
-              .font(.footnote)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-              .foregroundStyle(model.focus.routes == [route.id] && model.focus.direction == variant.direction ? Color.blue : Color.primary)
-              .padding(.leading, 46)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .contentShape(Rectangle())
+            VStack(alignment: .leading, spacing: 2) {
+              Label(model.directionTitle(route: route.id, direction: variant.direction), systemImage: model.directionSymbol(route: route.id, direction: variant.direction))
+                .font(.footnote)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .foregroundStyle(model.focus.routes == [route.id] && model.focus.direction == variant.direction ? Color.blue : Color.primary)
+              statusLine(route: route.id, direction: variant.direction).padding(.leading, 26)
+            }
+            .padding(.leading, 46)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
         }

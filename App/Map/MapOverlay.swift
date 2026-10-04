@@ -8,7 +8,9 @@ import HeadwayCore
 /// each parse. The next launch reads that copy and shows every route at once, while the full timetable loads in the
 /// background.
 struct MapOverlayData: Codable, Equatable, Sendable {
-  static let currentVersion = 1
+  /// Raise this whenever what the overlay holds, or how it is computed (for example the bundling of lanes), changes: a
+  /// saved copy of an older version is then ignored and rebuilt from the timetable.
+  static let currentVersion = 4
 
   struct RouteInfo: Codable, Equatable, Sendable {
     var id: String
@@ -19,10 +21,12 @@ struct MapOverlayData: Codable, Equatable, Sendable {
     var sortOrder: Int
   }
 
-  /// One route line in one direction, as parallel arrays of coordinates.
+  /// A stretch of one route line in one direction, as parallel arrays of coordinates. `lane` is the sideways step at
+  /// which it is drawn so that routes sharing a street lie next to each other (0 when alone); see `RouteBundler`.
   struct Line: Codable, Equatable, Sendable {
     var route: String
     var direction: Int
+    var lane: Double = 0
     var latitudes: [Double]
     var longitudes: [Double]
   }
@@ -55,15 +59,16 @@ struct MapOverlayData: Codable, Equatable, Sendable {
     routes = schedule.routes.values.sorted { ($0.sortOrder, $0.id) < ($1.sortOrder, $1.id) }.map {
       RouteInfo(id: $0.id, shortName: $0.shortName, longName: $0.longName, colorHex: $0.colorHex, textColorHex: $0.textColorHex, sortOrder: $0.sortOrder)
     }
-    var routeOfShape: [String: (route: String, direction: Int)] = [:]
-    for trip in schedule.trips.values where routeOfShape[trip.shapeID] == nil {
-      routeOfShape[trip.shapeID] = (trip.routeID, trip.directionID)
+    var tripOfShape: [String: Trip] = [:]
+    for trip in schedule.trips.values where tripOfShape[trip.shapeID] == nil { tripOfShape[trip.shapeID] = trip }
+    let inputs = schedule.shapes.compactMap { shapeID, points -> BundleInput? in
+      guard let trip = tripOfShape[shapeID], let route = schedule.routes[trip.routeID], points.count > 1 else { return nil }
+      return BundleInput(route: route.id, order: route.sortOrder, direction: trip.directionID, shapeID: shapeID, points: points)
     }
-    lines = schedule.shapes.compactMap { shapeID, points in
-      guard let owner = routeOfShape[shapeID], points.count > 1 else { return nil }
-      return Line(route: owner.route, direction: owner.direction, latitudes: points.map(\.latitude), longitudes: points.map(\.longitude))
+    lines = RouteBundler.bundle(inputs).map {
+      Line(route: $0.route, direction: $0.direction, lane: $0.lane, latitudes: $0.coordinates.map(\.latitude), longitudes: $0.coordinates.map(\.longitude))
     }
-    .sorted { ($0.route, $0.direction, $0.latitudes.count) < ($1.route, $1.direction, $1.latitudes.count) }
+    .sorted { ($0.route, $0.direction, $0.lane, $0.latitudes.first ?? 0) < ($1.route, $1.direction, $1.lane, $1.latitudes.first ?? 0) }
     stops = schedule.stops.values.sorted { $0.id < $1.id }.map {
       StopInfo(id: $0.id, name: $0.name, code: $0.code, latitude: $0.latitude, longitude: $0.longitude)
     }

@@ -20,6 +20,7 @@ struct RootView: View {
         VStack(spacing: 8) {
           StatusPill()
           if model.focus.isActive { FocusChip() }
+          if !model.routeChoices.isEmpty { RouteChooser() }
           if case .failed(let message) = model.phase { FailureBanner(message: message) }
         }
         .padding(.top, 8)
@@ -196,6 +197,42 @@ private struct JourneyBar: View {
   }
 }
 
+/// Which route did you mean? Shown when a tap lands on lines of several routes.
+private struct RouteChooser: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("Which route?").font(.footnote.weight(.semibold))
+        Spacer()
+        Button { model.routeChoices = [] } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+          .accessibilityLabel(Text("Close"))
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ForEach(model.routeChoices, id: \.self) { id in
+            Button { model.focusRoute(id, direction: nil, fit: false) } label: {
+              HStack(spacing: 6) {
+                RouteBadge(routeID: id)
+                let count = model.busCount(route: id, direction: nil)
+                Text("\(count)").font(.footnote.weight(.medium)).foregroundStyle(count > 0 ? Color.green : Color.secondary).monospacedDigit()
+                  .accessibilityLabel(Text("\(count) buses now"))
+              }
+              .padding(.horizontal, 8)
+              .padding(.vertical, 4)
+              .background(Color.primary.opacity(0.06), in: Capsule())
+            }
+            .buttonStyle(.plain)
+          }
+        }
+      }
+    }
+    .padding(12)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+}
+
 private struct FocusChip: View {
   @Environment(AppModel.self) private var model
 
@@ -204,7 +241,18 @@ private struct FocusChip: View {
     let single = focus.routes.count == 1 ? focus.routes.first : nil
     HStack(spacing: 8) {
       if let single { RouteBadge(routeID: single, compact: true) }
-      Text(title(focus, single: single)).font(.footnote.weight(.medium)).lineLimit(1)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(title(focus, single: single)).font(.footnote.weight(.medium)).lineLimit(1)
+        if let single, focus.label == nil {
+          let status = model.liveStatus(route: single, direction: focus.direction)
+          Text(status.text).font(.caption2).foregroundStyle(status.isRunning ? Color.green : Color.secondary).lineLimit(2)
+        }
+        if focus.isAlert {
+          // The dashes are the only sign of a detour on the map: say what they mean, and what is not known.
+          Text("Dashed line: the route has an alert. The city does not publish which streets a detour uses; see the details link.")
+            .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+      }
       if let single, focus.label == nil, model.variants(of: single).count > 1 {
         Menu {
           Button { model.setFocusDirection(nil) } label: { Label("Both directions", systemImage: focus.direction == nil ? "checkmark" : "arrow.left.arrow.right") }
@@ -225,7 +273,7 @@ private struct FocusChip: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
-    .background(.regularMaterial, in: Capsule())
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
   }
 
   private func title(_ focus: MapFocus, single: String?) -> String {

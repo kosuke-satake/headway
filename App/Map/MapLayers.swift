@@ -56,7 +56,7 @@ final class MapLayers {
     for line in overlay.data.lines where line.latitudes.count > 1 {
       var coordinates = zip(line.latitudes, line.longitudes).map { CLLocationCoordinate2D(latitude: $0, longitude: $1) }
       let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
-      feature.attributes = ["route": line.route, "dir": line.direction]
+      feature.attributes = ["route": line.route, "dir": line.direction, "lane": line.lane]
       polylines.append(feature)
     }
     routeSource = MLNShapeSource(identifier: "routes", features: polylines, options: nil)
@@ -198,6 +198,16 @@ final class MapLayers {
       format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)", stops as NSDictionary)
   }
 
+  /// A sideways offset of `lane` steps, where a step grows from `low` points at zoom 10 to `high` at zoom 16. The
+  /// multiplication sits inside the zoom curve's stops, which is the only place a style may combine the two.
+  private static func laneOffset(low: Double, high: Double) -> NSExpression {
+    func step(_ size: Double) -> NSExpression {
+      NSExpression(forFunction: "multiply:by:", arguments: [NSExpression(forKeyPath: "lane"), NSExpression(forConstantValue: size)])
+    }
+    let stops: [NSNumber: NSExpression] = [10: step(low), 16: step(high)]
+    return NSExpression(format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)", stops as NSDictionary)
+  }
+
   // MARK: Restyling
 
   /// Colours, widths and visibility of everything except the data (stops and buses), which have their own setters.
@@ -207,6 +217,7 @@ final class MapLayers {
     let prefs = state.prefs
     let focus = state.focus
     let width = prefs.routeLineWidth
+    let bundled = !focus.isActive && state.journeyID == nil
 
     for id in routeIDs {
       guard let route = overlay.routes[id], let line = lines[id], let casing = casings[id] else { continue }
@@ -224,6 +235,11 @@ final class MapLayers {
       line.lineColor = NSExpression(forConstantValue: look.fill)
       line.lineOpacity = NSExpression(forConstantValue: look.opacity)
       line.lineWidth = Self.ramp([10: 2 * width * boost, 16: 6 * width * boost])
+      // Routes that share a street lie side by side while looking at the whole network; a route on its own, or a
+      // journey, is drawn on the street itself.
+      let offset: NSExpression = bundled ? Self.laneOffset(low: 2 * width + 1, high: 6 * width + 2.5) : NSExpression(forConstantValue: 0)
+      line.lineOffset = offset
+      casing.lineOffset = offset
       // A route with an alert in force is dashed: its service differs from the usual.
       let alerted = state.alertRoutes.contains(id)
       line.lineCap = NSExpression(forConstantValue: alerted ? "butt" : "round")

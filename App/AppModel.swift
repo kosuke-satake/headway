@@ -85,6 +85,8 @@ final class AppModel {
   private(set) var overlay: MapOverlay?
   /// Direction (0 or 1) of each live bus's trip.
   private(set) var vehicleDirections: [String: Int] = [:]
+  /// Scheduled service of each route and direction (`outlookKey`), for "no buses right now" versus "not running today".
+  private(set) var outlooks: [String: ServiceOutlook] = [:]
   /// True when the board shows service after the next three hours because nothing else is coming.
   private(set) var arrivalsAreLater = false
   /// The stop to go back to from a bus opened out of that stop's board.
@@ -116,6 +118,8 @@ final class AppModel {
   private(set) var status: ServiceStatus?
   /// What the user asked the map to show on its own (a route, an alert, late buses); everything else is hidden or dimmed.
   private(set) var focus = MapFocus()
+  /// Routes under the finger after a tap on overlapping lines, waiting for the rider to say which one.
+  var routeChoices: [String] = []
   private(set) var cameraRequest: CameraRequest?
 
   @ObservationIgnored private let client = RealtimeClient()
@@ -152,6 +156,20 @@ final class AppModel {
 
   /// Route ids serving each stop, ordered like the route list.
   var routesByStop: [String: [String]] { overlay?.network.routesByStop ?? [:] }
+
+  /// Key of `outlooks`: a route in one direction, or in both (nil).
+  nonisolated static func outlookKey(route: String, direction: Int?) -> String { "\(route)|\(direction.map(String.init) ?? "*")" }
+
+  func outlook(route: String, direction: Int?) -> ServiceOutlook? { outlooks[Self.outlookKey(route: route, direction: direction)] }
+
+  /// Buses on a route (in one direction, or both) in the live feed.
+  func busCount(route: String, direction: Int?) -> Int {
+    vehicles.reduce(0) { count, vehicle in
+      guard vehicle.routeID == route else { return count }
+      if let direction, vehicleDirections[vehicle.id] != direction { return count }
+      return count + 1
+    }
+  }
 
   /// The ways a route runs (one entry per direction).
   func variants(of route: String) -> [RouteVariant] { overlay?.network.variants(of: route) ?? [] }
@@ -297,7 +315,7 @@ final class AppModel {
 
   /// Runs the planner with what the app currently knows, and remembers the search.
   func searchJourneys() async {
-    if let from = plan.from, let to = plan.to { settings.noteRecent(from: from, to: to) }
+    if let from = plan.from, let to = plan.to { settings.noteRecent(from: from, to: to, vias: plan.storedVias) }
     await plan.search(planContext())
   }
 
@@ -324,6 +342,7 @@ final class AppModel {
   /// Starts a trip from the rider's location (or the previous start) to `point`, in the planner.
   func startDirections(to point: PlanPoint) {
     plan.to = .point(point)
+    plan.vias = []
     if plan.from == nil || plan.from == plan.to { plan.from = .myLocation }
     plan.clearResults()
     mapJourney = nil
@@ -335,6 +354,7 @@ final class AppModel {
   /// Starts a trip from `point` to wherever the rider wants to go.
   func startDirections(from point: PlanPoint) {
     plan.from = .point(point)
+    plan.vias = []
     if plan.to == plan.from { plan.to = nil }
     plan.clearResults()
     mapJourney = nil
@@ -347,30 +367,40 @@ final class AppModel {
     sheet = nil
   }
 
-  /// Shows only `id` (in one direction, or both) and fits the camera to it.
-  func focusRoute(_ id: String, direction: Int? = nil) {
+  /// Shows only `id` (in one direction, or both). Choosing from a list zooms out to the whole route; tapping the map
+  /// does not move the camera.
+  func focusRoute(_ id: String, direction: Int? = nil, fit: Bool = true) {
+    routeChoices = []
     focus = .route(id, direction: direction)
     if mode != .map { mode = .map }
-    fitToFocus()
+    if fit { fitToFocus() }
   }
 
-  /// A tap on a route line: look at that route alone, or leave the focus when it is already the one.
-  func toggleFocus(route id: String) {
-    if focus.routes == [id], focus.highlightedStops.isEmpty, focus.highlightedBuses.isEmpty {
-      focus = MapFocus()
+  /// A tap on route lines: one route is looked at on its own (or let go of when it already is); several ask which.
+  func tapRoutes(_ ids: [String]) {
+    let ordered = ids.sorted { (route($0)?.sortOrder ?? .max, $0) < (route($1)?.sortOrder ?? .max, $1) }
+    if ordered.count == 1, let id = ordered.first {
+      if focus.routes == [id], focus.highlightedStops.isEmpty, focus.highlightedBuses.isEmpty {
+        focus = MapFocus()
+      } else {
+        focusRoute(id, direction: nil, fit: false)
+      }
+      routeChoices = []
     } else {
-      focusRoute(id, direction: nil)
+      routeChoices = ordered
     }
   }
 
-  func clearFocus() { focus = MapFocus() }
+  func clearFocus() {
+    focus = MapFocus()
+    routeChoices = []
+  }
 
   /// Changes the direction of the route in focus (nil for both).
   func setFocusDirection(_ direction: Int?) {
     guard focus.routes.count == 1 else { return }
     focus.direction = direction
     focus.fromBus = false
-    fitToFocus()
   }
 
   /// "Show on map" for an alert: its routes, and the stops its text names, ringed.
@@ -380,6 +410,7 @@ final class AppModel {
     var next = MapFocus(routes: Set(routes))
     next.highlightedStops = alertStops(alert)
     next.label = alert.header
+    next.isAlert = true
     focus = next
     sheet = nil
     mode = .map
@@ -544,7 +575,25 @@ final class AppModel {
       Task.detached(priority: .utility) { OverlayStore.save(data) }
     }
     vehicleDirections = directions(of: vehicles)
+    refreshOutlooks()
     refreshArrivals()
+  }
+
+  /// Works out today's service of every route and direction in the background (a few hundred milliseconds in a Release
+  /// build); called when the timetable arrives and when a screen that shows it opens.
+  func refreshOutlooks() {
+    guard let schedule, let overlay else { return }
+    let routes = overlay.orderedRoutes.map(\.id)
+    Task.detached(priority: .utility) { [weak self] in
+      let now = Date()
+      var result: [String: ServiceOutlook] = [:]
+      for route in routes {
+        for direction in [nil, 0, 1] as [Int?] {
+          result[Self.outlookKey(route: route, direction: direction)] = schedule.outlook(route: route, direction: direction, at: now)
+        }
+      }
+      await MainActor.run { self?.outlooks = result }
+    }
   }
 
   /// The direction of each bus's trip, from the timetable.

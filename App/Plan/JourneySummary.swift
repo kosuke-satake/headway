@@ -11,7 +11,13 @@ struct JourneySummary {
       "\(from) → \(to)",
       "\(text.clock(journey.departure)) → \(text.clock(journey.arrival)) · \(TimeText.duration(journey.duration))",
     ]
-    for leg in journey.legs {
+    for (index, leg) in journey.legs.enumerated() {
+      defer {
+        for stay in journey.stopovers where stay.afterLeg == index {
+          lines.append(
+            "• " + String(localized: "Stay at \(stay.place.name)") + ": \(text.clock(stay.arrive))–\(text.clock(stay.leave)) · \(TimeText.duration(stay.duration))")
+        }
+      }
       switch leg {
       case .walk(let walk):
         lines.append("• " + String(localized: "Walk \(TimeText.duration(walk.end.timeIntervalSince(walk.start))) to \(walk.to.name)"))

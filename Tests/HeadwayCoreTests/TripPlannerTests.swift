@@ -10,7 +10,7 @@ import Testing
 ///     C2 (100 m south of C) --R4--> E          (C2 08:15, E 08:30)
 ///
 /// Each route also runs an hour later. R2 has an extra trip leaving C 30 s after R1 arrives (too tight to use).
-private func makePlannerFeed(stopAccess: [String: Int] = [:], tripAccess: [String: Int] = [:]) throws -> Schedule {
+func makePlannerFeed(stopAccess: [String: Int] = [:], tripAccess: [String: Int] = [:]) throws -> Schedule {
   let dir = FileManager.default.temporaryDirectory.appendingPathComponent("headway-plan-\(UUID().uuidString)")
   try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
   var stopTimes = "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
@@ -381,5 +381,83 @@ private func makePlannerFeed(stopAccess: [String: Int] = [:], tripAccess: [Strin
     options.minTransferSeconds = 600
     let journeys = planner.plan(from: stop("A"), to: stop("D"), departAt: monday(7, 55), options: options)
     #expect(!journeys.contains { $0.rides.map(\.tripID) == ["r1a", "r2a"] })
+  }
+}
+
+@Suite struct PlannerMultiStopTests {
+  private func monday(_ schedule: Schedule, _ h: Int, _ m: Int) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = schedule.timeZone
+    return calendar.date(from: DateComponents(year: 2026, month: 10, day: 5, hour: h, minute: m))!
+  }
+
+  private func point(_ schedule: Schedule, _ id: String) -> PlanPoint {
+    let stop = schedule.stops[id]!
+    return PlanPoint(name: stop.name, coordinate: Coordinate(latitude: stop.latitude, longitude: stop.longitude), stopID: id)
+  }
+
+  /// Short walks only, so that the buses are what gets the rider from place to place.
+  private var shortWalks: PlanOptions {
+    var options = PlanOptions()
+    options.maxWalkMeters = 400
+    return options
+  }
+
+  @Test func aTripThroughAStopStaysThereForAtLeastTheAskedTime() throws {
+    // A to C by route 1 (arriving 08:10), a ten minute stay at C, then C to D by route 2: the 08:15 bus is missed, the
+    // 09:15 one is taken.
+    let schedule = try makePlannerFeed()
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), via: [ViaStop(point: point(schedule, "C"), dwell: 600)], to: point(schedule, "D"),
+      departAt: monday(schedule, 7, 55), options: shortWalks)
+    let best = try #require(journeys.first)
+    #expect(best.rides.map(\.routeID) == ["R1", "R2"])
+    let stay = try #require(best.stopovers.first)
+    #expect(best.stopovers.count == 1)
+    #expect(stay.place.stopID == "C")
+    #expect(stay.afterLeg == 0)
+    #expect(stay.arrive == monday(schedule, 8, 10))
+    #expect(stay.leave >= stay.arrive.addingTimeInterval(600))
+    #expect(best.arrival >= stay.leave)
+  }
+
+  @Test func theStayIsNotCountedAsATransfer() throws {
+    let schedule = try makePlannerFeed()
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), via: [ViaStop(point: point(schedule, "C"), dwell: 600)], to: point(schedule, "D"),
+      departAt: monday(schedule, 7, 55), options: shortWalks)
+    let best = try #require(journeys.first)
+    #expect(best.transferBuffers.isEmpty)
+  }
+
+  @Test func withoutStopsItIsTheOrdinaryPlan() throws {
+    let schedule = try makePlannerFeed()
+    let planner = TripPlanner(schedule: schedule)
+    let plain = planner.plan(from: point(schedule, "A"), to: point(schedule, "D"), departAt: monday(schedule, 7, 55))
+    let via = planner.plan(from: point(schedule, "A"), via: [], to: point(schedule, "D"), departAt: monday(schedule, 7, 55))
+    #expect(!via.isEmpty)
+    #expect(via.allSatisfy { $0.stopovers.isEmpty })
+    #expect(via.map(\.id).sorted() == plain.prefix(4).map(\.id).sorted() || via.first?.arrival == plain.map(\.arrival).min())
+  }
+
+  @Test func arrivingByWorksBackwardsThroughTheStay() throws {
+    let schedule = try makePlannerFeed()
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), via: [ViaStop(point: point(schedule, "C"), dwell: 300)], to: point(schedule, "D"),
+      arriveBy: monday(schedule, 9, 30), options: shortWalks, earliestStart: monday(schedule, 6, 0))
+    let best = try #require(journeys.last)
+    #expect(best.arrival <= monday(schedule, 9, 30))
+    let stay = try #require(best.stopovers.first)
+    #expect(stay.duration >= 300)
+    #expect(best.rides.map(\.routeID) == ["R1", "R2"])
+  }
+
+  @Test func ifAPartCannotBeDoneThereIsNoJourney() throws {
+    // F is far from every stop, so nothing reaches it.
+    let schedule = try makePlannerFeed()
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), via: [ViaStop(point: point(schedule, "F"), dwell: 600)], to: point(schedule, "D"),
+      departAt: monday(schedule, 7, 55))
+    #expect(journeys.isEmpty)
   }
 }

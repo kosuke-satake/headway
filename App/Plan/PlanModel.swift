@@ -16,6 +16,15 @@ enum PlaceChoice: Equatable {
   }
 }
 
+/// A place to stop at on the way, and for how long.
+struct PlanVia: Identifiable, Equatable {
+  let id = UUID()
+  var place: PlaceChoice?
+  var dwellMinutes = 10
+
+  static let dwellChoices = [5, 10, 15, 30, 60, 120]
+}
+
 /// What the planner needs from the rest of the app for one search.
 struct PlanContext {
   let schedule: Schedule?
@@ -43,6 +52,9 @@ final class PlanModel {
 
   var from: PlaceChoice? = .myLocation
   var to: PlaceChoice?
+  /// Places to stop at between the start and the destination (at most `maxVias`).
+  var vias: [PlanVia] = []
+  static let maxVias = 3
   var departure: Departure = .now
   private(set) var results: [Journey] = []
   private(set) var phase: Phase = .idle
@@ -53,9 +65,24 @@ final class PlanModel {
   private(set) var noLater = false
   private(set) var isLoadingMore = false
 
-  var canSearch: Bool { from != nil && to != nil }
+  var canSearch: Bool { from != nil && to != nil && vias.allSatisfy { $0.place != nil } }
 
-  func swap() { (from, to) = (to, from) }
+  /// The stops as saved with a trip.
+  var storedVias: [StoredVia] {
+    vias.compactMap { via in via.place.map { StoredVia(end: StoredEnd($0), dwellMinutes: via.dwellMinutes) } }
+  }
+
+  func swap() {
+    (from, to) = (to, from)
+    vias.reverse()
+  }
+
+  func addVia() {
+    guard vias.count < Self.maxVias else { return }
+    vias.append(PlanVia())
+  }
+
+  func removeVia(_ id: UUID) { vias.removeAll { $0.id == id } }
 
   func clearResults() {
     results = []
@@ -80,8 +107,29 @@ final class PlanModel {
     noEarlier = false
     noLater = false
     let mode = departure
+    let stops = resolveVias(context.here)
+    guard let stops else {
+      phase = .failed(String(localized: "Choose a place for each stop on the way."))
+      return
+    }
     let journeys = await Task.detached(priority: .userInitiated) { () -> [Journey] in
       let planner = TripPlanner(schedule: schedule)
+      if !stops.isEmpty {
+        switch mode {
+        case .now:
+          return planner.plan(
+            from: origin, via: stops, to: destination, departAt: Date(), options: context.options, predictions: context.predictions,
+            vehicles: context.vehicles)
+        case .at(let date):
+          return planner.plan(
+            from: origin, via: stops, to: destination, departAt: date, options: context.options, predictions: context.predictions,
+            vehicles: context.vehicles)
+        case .arriveBy(let deadline):
+          return planner.plan(
+            from: origin, via: stops, to: destination, arriveBy: deadline, options: context.options,
+            predictions: context.predictions, vehicles: context.vehicles)
+        }
+      }
       switch mode {
       case .now:
         return planner.plan(
@@ -99,6 +147,11 @@ final class PlanModel {
     }.value
     results = journeys
     searchedAt = Date()
+    // Earlier and later buses are only offered for a trip without stops on the way.
+    if !stops.isEmpty {
+      noEarlier = true
+      noLater = true
+    }
     phase = .done
   }
 
@@ -140,6 +193,16 @@ final class PlanModel {
     } else {
       results += fresh
     }
+  }
+
+  /// The stops on the way, ready for the planner; nil when one of them has no place yet.
+  private func resolveVias(_ here: CLLocation?) -> [ViaStop]? {
+    var result: [ViaStop] = []
+    for via in vias {
+      guard let place = via.place, let point = resolve(place, here: here) else { return nil }
+      result.append(ViaStop(point: point, dwell: Double(via.dwellMinutes) * 60))
+    }
+    return result
   }
 
   private func resolveEnds(_ here: CLLocation?) -> (PlanPoint, PlanPoint)? {

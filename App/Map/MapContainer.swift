@@ -7,7 +7,8 @@ import SwiftUI
 enum MapTap {
   case stop(String)
   case bus(String)
-  case route(String)
+  /// Every route whose line passes under the finger (several when lines overlap).
+  case routes([String])
   case empty
 }
 
@@ -39,9 +40,12 @@ struct MapContainer: UIViewRepresentable {
       switch tap {
       case .stop(let id): model.selectStop(id)
       case .bus(let id): model.selectBus(id)
-      case .route(let id): model.toggleFocus(route: id)
+      case .routes(let ids): model.tapRoutes(ids)
       case .empty:
-        // A journey's summary stays open while looking around the map; a stop or bus sheet closes.
+        // A journey's summary stays open while looking around the map; a stop or bus sheet closes. Tapping the empty
+        // map also lets go of a route that was looked at on its own.
+        model.routeChoices = []
+        if model.focus.isActive, model.mapJourney == nil { model.clearFocus() }
         switch model.sheet {
         case .stop?, .bus?: model.clearSelection()
         default: break
@@ -311,9 +315,12 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
       return
     }
     let box = CGRect(x: point.x - 14, y: point.y - 14, width: 28, height: 28)
-    let lines = mapView.visibleFeatures(in: box, styleLayerIdentifiers: layers.lineLayerIDs)
-    if let route = lines.first?.attribute(forKey: "route") as? String {
-      onTap?(.route(route))
+    var routes: [String] = []
+    for line in mapView.visibleFeatures(in: box, styleLayerIdentifiers: layers.lineLayerIDs) {
+      if let route = line.attribute(forKey: "route") as? String, !routes.contains(route) { routes.append(route) }
+    }
+    if !routes.isEmpty {
+      onTap?(.routes(routes))
       return
     }
     onTap?(.empty)

@@ -45,13 +45,13 @@ import Testing
 
   @Test func recentTripsAreUniqueAndCapped() {
     let settings = makeSettings()
-    for index in 0..<15 {
+    for index in 0..<40 {
       settings.noteRecent(from: .myLocation, to: .point(point("Place \(index)", 43.0 + Double(index) * 0.01, stop: "s\(index)")))
     }
-    settings.noteRecent(from: .myLocation, to: .point(point("Place 3", 43.03, stop: "s3")))
-    #expect(settings.values.recentTrips.count == 10)
-    #expect(settings.values.recentTrips.first?.to.place?.stopID == "s3")
-    #expect(Set(settings.values.recentTrips.compactMap { $0.to.place?.stopID }).count == 10)
+    settings.noteRecent(from: .myLocation, to: .point(point("Place 33", 43.33, stop: "s33")))
+    #expect(settings.values.recentTrips.count == 30)
+    #expect(settings.values.recentTrips.first?.to.place?.stopID == "s33")
+    #expect(Set(settings.values.recentTrips.compactMap { $0.to.place?.stopID }).count == 30)
   }
 
   @Test func differentPlacesDoNotMatch() {

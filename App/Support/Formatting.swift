@@ -40,6 +40,12 @@ struct TimeText {
     return seconds > 0 ? String(localized: "\(minutes) min late") : String(localized: "\(minutes) min early")
   }
 
+  /// "10 min", "1 h", "1 h 30 min".
+  static func minutesLabel(_ minutes: Int) -> String {
+    if minutes < 60 { return String(localized: "\(minutes) min") }
+    return minutes % 60 == 0 ? String(localized: "\(minutes / 60) h") : String(localized: "\(minutes / 60) h \(minutes % 60) min")
+  }
+
   static func distance(_ meters: Double) -> String {
     let measurement = Measurement(value: meters, unit: UnitLength.meters)
     let formatter = MeasurementFormatter()
