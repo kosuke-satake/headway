@@ -27,6 +27,8 @@ public struct Stop: Sendable, Identifiable, Hashable {
   public let longitude: Double
   /// Bearing in degrees the stop faces (GTFS extension `cardinal_direction`), when provided.
   public let facing: Int?
+  /// GTFS `wheelchair_boarding`: 0 unknown, 1 accessible, 2 not accessible.
+  public let wheelchairBoarding: Int
 }
 
 public struct Trip: Sendable, Identifiable, Hashable {
@@ -37,6 +39,8 @@ public struct Trip: Sendable, Identifiable, Hashable {
   public let directionID: Int
   public let shapeID: String
   public let blockID: String
+  /// GTFS `wheelchair_accessible`: 0 unknown, 1 accessible, 2 not accessible.
+  public let wheelchairAccessible: Int
 }
 
 public struct StopTime: Sendable, Hashable {

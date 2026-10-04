@@ -112,7 +112,8 @@ public struct Schedule: Sendable {
         name: row.string(sh["stop_name"]),
         latitude: lat,
         longitude: lon,
-        facing: row.int(sh["cardinal_direction"])
+        facing: row.int(sh["cardinal_direction"]),
+        wheelchairBoarding: row.int(sh["wheelchair_boarding"]) ?? 0
       )
     }
     self.stops = stops
@@ -130,7 +131,8 @@ public struct Schedule: Sendable {
         headsign: row.string(th["trip_headsign"]),
         directionID: row.int(th["direction_id"]) ?? 0,
         shapeID: row.string(th["shape_id"]),
-        blockID: row.string(th["block_id"])
+        blockID: row.string(th["block_id"]),
+        wheelchairAccessible: row.int(th["wheelchair_accessible"]) ?? 0
       )
     }
     self.trips = trips

@@ -17,7 +17,15 @@ time, and the next arrivals at any stop. English UI with a Japanese localization
   that should be running but report no position, and the next buses at your favourite stops); and **Plan a trip**.
 - **Trip planner.** From your location, a stop, a place found by name (Apple Maps, needs a connection) or a pin you
   long-press on the map, to anywhere. It finds journeys with walking and transfers, takes the live delay of reporting
-  buses into account, shows them step by step and draws them on the map.
+  buses into account, shows them step by step and draws them on the map. Leave now, depart at, or **arrive by**; earlier
+  and later buses; sort by departure, arrival, transfers or walking; badges for the fastest, fewest-transfer and
+  least-walking journeys. **Saved places** (Home, Work, others), **saved trips** (one tap to plan again), recent trips,
+  walking speed, longest walk, most transfers, time to change buses, wheelchair-accessible only, a reminder before you
+  have to leave, and sharing a journey as text.
+- **How punctual, and how live.** The live line reports the age of the bus positions (they are about 25 s old; the city's
+  feed is rebuilt every 30 s). Buses are moved along their route between reports. Stop sheets show, for the time of week,
+  the share of buses that were early, on time or late at that stop, and live arrivals carry the range the bus has come in
+  on 9 of 10 past occasions. These come from recordings the project makes itself (see `docs/data-sources.md`).
 - **Follow a bus.** Tap a bus to see its next stops with predicted times.
 - **Focus.** Tap a route to see only that route and its stops; hide routes you never use.
 - **Search** by stop name or sign number; favourites, recents and nearby stops.
@@ -36,6 +44,7 @@ and Node (for the map style). With Homebrew: `brew install xcodegen pmtiles node
 ```bash
 tools/fetch_basemap.sh      # map tiles (18 MB) and label glyphs
 tools/fetch_timetable.sh    # timetable bundled for the first launch (7 MB)
+tools/build_punctuality.sh  # punctuality statistics from recordings (an empty table if there are none)
 xcodegen generate           # creates Headway.xcodeproj
 open Headway.xcodeproj      # run on a simulator or your iPhone
 ```
@@ -60,7 +69,7 @@ must be re-signed every 7 days.
 ## Quality checks
 
 ```bash
-swift test                                                       # data layer (55 tests)
+swift test                                                       # data layer (84 tests)
 xcodebuild test -project Headway.xcodeproj -scheme Headway \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO   # app tests (16)
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO   # app tests (26)
 ```

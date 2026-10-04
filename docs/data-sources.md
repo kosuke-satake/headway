@@ -53,6 +53,39 @@ From `feedanalysis report` on the first 35 minutes of the recording:
   built; it is not verified. The 24 h report (`docs/feed-analysis-2026-10-03.md`, written automatically) is the
   better basis.
 
+## How live the feed really is (measured 2026-10-03 from 728 fetches)
+
+| | median | p90 |
+|---|---:|---:|
+| a bus reports every | 30 s | 36 s |
+| the server rebuilds the feed every | 30 s | 41 s |
+| age of a position inside the feed | 11 s | 20 s |
+| age of the feed when fetched at random | 15 s | 31 s |
+
+So a position on screen is about 25 s old on average and can be nearly a minute old. About half of the fetches of a
+10-second poll returned the same data. The response has a `Date` header (the server's clock), which the app uses to
+fetch right after each rebuild.
+
+## How good the live predictions are (first 3 hours of recordings, Saturday evening)
+
+Predicted arrival at a stop compared with the arrival observed afterwards from bus positions (error in seconds, median
+absolute / 90th percentile, by how far ahead the prediction was made):
+
+| ahead | live prediction | timetable |
+|---|---|---|
+| 0-2 min | 21 / 73 | 117 / 429 |
+| 2-5 min | 42 / 132 | 120 / 431 |
+| 5-10 min | 65 / 193 | 121 / 429 |
+| 10-20 min | 93 / 270 | 123 / 429 |
+| 20-30 min | 112 / 335 | 130 / 435 |
+
+The timetable runs about 100 s earlier than reality on average (bias -100 s); live predictions have almost no bias
+close in. Observed punctuality over the same hours: about 11% of arrivals more than a minute early, 70% on time,
+19% more than five minutes late. Regenerate with `feedanalysis accuracy data/feeds`.
+
+No public history of on-time performance by stop was found (the city publishes ridership and annual reports), so the
+statistics are built from the project's own recordings.
+
 ## Alerts
 
 Nine alerts on 2026-10-03, all with effect `DETOUR`, a description, a link to a city detour page and a coarse active

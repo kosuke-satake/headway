@@ -86,6 +86,11 @@ struct SettingsView: View {
           }
         }
 
+        Section("Trip planner") {
+          NavigationLink("Trip options") { PlanOptionsForm().navigationTitle("Trip options").navigationBarTitleDisplayMode(.inline) }
+          NavigationLink("Saved places") { SavedPlacesView() }
+        }
+
         Section("Favorites") {
           NavigationLink("Favorite stops") { FavoriteStopsView() }
           LabeledContent("Favorite routes", value: "\(settings.values.favoriteRoutes.count)")

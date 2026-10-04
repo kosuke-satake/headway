@@ -21,6 +21,14 @@ public struct WalkLeg: Sendable, Hashable {
   public let end: Date
   /// Straight-line distance; real streets are longer, which the time estimate allows for.
   public let meters: Double
+
+  public init(from: PlanPoint, to: PlanPoint, start: Date, end: Date, meters: Double) {
+    self.from = from
+    self.to = to
+    self.start = start
+    self.end = end
+    self.meters = meters
+  }
 }
 
 public struct RideLeg: Sendable, Hashable {
@@ -36,6 +44,22 @@ public struct RideLeg: Sendable, Hashable {
   /// Seconds late (positive) or early at boarding, when live data was used for this trip.
   public let delay: Int?
   public let isLive: Bool
+
+  public init(
+    tripID: String, routeID: String, headsign: String, fromStop: PlanPoint, toStop: PlanPoint, depart: Date, arrive: Date,
+    stopCount: Int, delay: Int?, isLive: Bool
+  ) {
+    self.tripID = tripID
+    self.routeID = routeID
+    self.headsign = headsign
+    self.fromStop = fromStop
+    self.toStop = toStop
+    self.depart = depart
+    self.arrive = arrive
+    self.stopCount = stopCount
+    self.delay = delay
+    self.isLive = isLive
+  }
 }
 
 public enum JourneyLeg: Sendable, Hashable {
@@ -64,6 +88,8 @@ public struct Journey: Sendable, Identifiable, Hashable {
   }
 
   public let legs: [JourneyLeg]
+
+  public init(legs: [JourneyLeg]) { self.legs = legs }
 
   public var departure: Date { legs.first?.start ?? .distantPast }
   public var arrival: Date { legs.last?.end ?? .distantPast }

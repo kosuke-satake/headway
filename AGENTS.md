@@ -102,9 +102,9 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Tools installed with Homebrew for this project: protobuf, swift-protobuf, pmtiles, xcodegen.
 - App: `xcodegen generate`, then
   `xcodebuild -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO`.
-- Tests: `swift test` (data layer, 55) and
+- Tests: `swift test` (data layer, 84) and
   `xcodebuild test -project Headway.xcodeproj -scheme Headway -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO`
-  (app, 16).
+  (app, 26).
 - Before building the app: `tools/fetch_basemap.sh` and `tools/fetch_timetable.sh` (both outputs are bundled by
   `project.yml` and not committed), then `xcodegen generate`.
 - Icon: `swift tools/make_icon.swift App/Resources/Assets.xcassets/AppIcon.appiconset` (light, dark, tinted).
@@ -112,6 +112,11 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
   a search field through the control tool is slow; wait before the next tap.
 - The 24 h feed report is written by a launchd job (`data/launchd/dev.kosuke.headway.report.plist`) to
   `docs/feed-analysis-2026-10-03.md` at 2026-10-04 17:10 CDT.
+- Recordings run continuously (launchd job `dev.kosuke.headway.recorder`, `tools/record_feeds.py`, one folder per day in
+  `data/feeds/`, a snapshot saved only when it changed, about 15 MB a day). A nightly job (04:30) runs
+  `tools/build_punctuality.sh`, which turns recorded bus positions into observed arrival times (SQLite,
+  `data/punctuality/observations.sqlite`) and exports `data/punctuality/punctuality.json`, which the app bundles.
+  `feedanalysis freshness|accuracy|punctuality` explain the feed's real latency, prediction accuracy and punctuality.
 - Format, lint: not set up yet.
 
 ## Known limits and next steps
@@ -120,6 +125,12 @@ Workspace rules are in `~/Developer/AGENTS.md`; this file adds what is specific 
 - Predictions come from the city's trip-updates feed, which has no delay field and covers only trips with a bus;
   the board therefore shows the timetable for the rest. Whether predictions are biased is unverified (see
   `docs/data-sources.md`).
+- Live latency (measured on 2026-10-03, see `docs/data-sources.md`): a bus reports every 30 s, the feed is rebuilt every
+  30 s, positions are about 25 s old on arrival. The app times its requests from the server's `Date` header, dead-reckons
+  buses along their route at their last speed (up to 50 s), and veils buses silent for over 75 s. Predictions are
+  accurate to about +/-40 s (median) within 5 minutes and barely better than the timetable beyond 20 minutes.
+- Punctuality statistics need weeks of recordings to be reliable; the app says how many days they cover and shows
+  nothing for a route and time of week with too few observations.
 - Detour paths are not published by the city (the alerts have text, a link to its detour page, and a period). Buses on
   routes with an alert were mostly on their normal line in the first recording, so inferring detour paths from live
   positions is not reliable yet; the app dashes affected routes and rings buses that are off their line.

@@ -14,6 +14,7 @@ struct PlacePicker: View {
   @State private var query = ""
   @State private var places: [PlanPoint] = []
   @State private var placeSearchFailed = false
+  @State private var placeSearchDone = false
   @State private var searchTask: Task<Void, Never>?
 
   var body: some View {
@@ -48,8 +49,18 @@ struct PlacePicker: View {
         }
       }
     }
+    let saved = model.settings.values.savedPlaces.sorted { ($0.kind == .other ? 1 : 0, $0.name) < ($1.kind == .other ? 1 : 0, $1.name) }
+    if !saved.isEmpty {
+      Section("Saved places") {
+        ForEach(saved) { place in
+          Button { pick(.point(place.point)) } label: {
+            Label(place.name, systemImage: place.kind.symbol).foregroundStyle(.primary)
+          }
+        }
+      }
+    }
     let favorites = model.settings.values.favoriteStops.compactMap { model.schedule?.stops[$0] }
-    if !favorites.isEmpty { Section("Favorites") { ForEach(favorites) { stopRow($0) } } }
+    if !favorites.isEmpty { Section("Favorite stops") { ForEach(favorites) { stopRow($0) } } }
     let recents = model.settings.values.recentStops.compactMap { model.schedule?.stops[$0] }.filter { !model.settings.isFavorite(stop: $0.id) }
     if !recents.isEmpty { Section("Recent") { ForEach(recents) { stopRow($0) } } }
     if favorites.isEmpty, recents.isEmpty {
@@ -62,13 +73,14 @@ struct PlacePicker: View {
     if !stops.isEmpty { Section("Bus stops") { ForEach(stops) { stopRow($0) } } }
     Section {
       if places.isEmpty {
-        Text(placeSearchFailed ? "Place search needs a connection." : "Searching places…")
+        Text(placeSearchFailed ? "Place search needs a connection." : (placeSearchDone ? "No places found." : "Searching places…"))
           .font(.footnote).foregroundStyle(.secondary)
       }
       ForEach(places, id: \.name) { place in
         Button { pick(.point(place)) } label: {
           Label(place.name, systemImage: "mappin.and.ellipse").foregroundStyle(.primary)
         }
+        .contextMenu { saveMenu(place) }
       }
     } header: {
       Text("Places")
@@ -93,6 +105,15 @@ struct PlacePicker: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .contextMenu {
+      saveMenu(PlanPoint(name: stop.name, coordinate: Coordinate(latitude: stop.latitude, longitude: stop.longitude), stopID: stop.id))
+    }
+  }
+
+  @ViewBuilder private func saveMenu(_ point: PlanPoint) -> some View {
+    Button("Save as Home", systemImage: "house") { model.settings.save(place: point, as: .home) }
+    Button("Save as Work", systemImage: "briefcase") { model.settings.save(place: point, as: .work) }
+    Button("Save place", systemImage: "star") { model.settings.save(place: point, as: .other) }
   }
 
   // MARK: Logic
@@ -117,8 +138,9 @@ struct PlacePicker: View {
     searchTask?.cancel()
     places = []
     placeSearchFailed = false
+    placeSearchDone = false
     let text = value.trimmingCharacters(in: .whitespaces)
-    guard text.count >= 3 else { return }
+    guard text.count >= 3 else { placeSearchDone = true; return }
     searchTask = Task {
       try? await Task.sleep(for: .milliseconds(450))
       guard !Task.isCancelled else { return }
@@ -137,9 +159,12 @@ struct PlacePicker: View {
           guard abs(coordinate.latitude - 43.07) < 0.3, abs(coordinate.longitude + 89.4) < 0.4 else { return nil }
           return PlanPoint(name: name, coordinate: Coordinate(latitude: coordinate.latitude, longitude: coordinate.longitude))
         }
-        placeSearchFailed = places.isEmpty
+        placeSearchDone = true
       } catch {
-        if !Task.isCancelled { placeSearchFailed = true }
+        if !Task.isCancelled {
+          placeSearchFailed = true
+          placeSearchDone = true
+        }
       }
     }
   }

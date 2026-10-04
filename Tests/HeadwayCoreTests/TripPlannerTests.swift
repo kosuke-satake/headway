@@ -10,7 +10,7 @@ import Testing
 ///     C2 (100 m south of C) --R4--> E          (C2 08:15, E 08:30)
 ///
 /// Each route also runs an hour later. R2 has an extra trip leaving C 30 s after R1 arrives (too tight to use).
-private func makePlannerFeed() throws -> Schedule {
+private func makePlannerFeed(stopAccess: [String: Int] = [:], tripAccess: [String: Int] = [:]) throws -> Schedule {
   let dir = FileManager.default.temporaryDirectory.appendingPathComponent("headway-plan-\(UUID().uuidString)")
   try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
   var stopTimes = "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
@@ -28,24 +28,20 @@ private func makePlannerFeed() throws -> Schedule {
   trip("r4a", [("C2", "08:15:00"), ("E", "08:30:00")])
   let routeOf = ["r1a": "R1", "r1b": "R1", "r2a": "R2", "r2b": "R2", "r2tight": "R2", "r3": "R3", "r4a": "R4"]
   let shapeOf = ["R1": "s1", "R2": "s2", "R3": "s3", "R4": "s4"]
-  var trips = "trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,block_id\n"
+  var trips = "trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,block_id,wheelchair_accessible\n"
   for (id, route) in routeOf.sorted(by: { $0.key < $1.key }) {
-    trips += "\(id),\(route),wk,To \(route),0,\(shapeOf[route]!),b\(id)\n"
+    trips += "\(id),\(route),wk,To \(route),0,\(shapeOf[route]!),b\(id),\(tripAccess[id] ?? 0)\n"
+  }
+  let stopRows = [("A", 43.0, -89.4), ("B", 43.0, -89.39), ("C", 43.0, -89.38), ("D", 43.01, -89.38), ("C2", 42.9991, -89.38), ("E", 43.01, -89.37), ("F", 43.1, -89.3)]
+  var stopsText = "stop_id,stop_code,stop_name,stop_lat,stop_lon,wheelchair_boarding\n"
+  for (index, row) in stopRows.enumerated() {
+    let names = ["Alpha", "Bravo", "Charlie", "Delta", "Charlie South", "Echo", "Far"]
+    stopsText += "\(row.0),\(index + 1),\(names[index]),\(row.1),\(row.2),\(stopAccess[row.0] ?? 0)\n"
   }
   let files: [String: String] = [
     "agency.txt": "agency_id,agency_name,agency_timezone\n1,Test,America/Chicago\n",
     "routes.txt": "route_id,route_short_name,route_long_name,route_color,route_text_color,route_sort_order\nR1,1,One,FF0000,FFFFFF,1\nR2,2,Two,00FF00,000000,2\nR3,3,Three,0000FF,FFFFFF,3\nR4,4,Four,FFFF00,000000,4\n",
-    "stops.txt": """
-      stop_id,stop_code,stop_name,stop_lat,stop_lon
-      A,1,Alpha,43.0000,-89.4000
-      B,2,Bravo,43.0000,-89.3900
-      C,3,Charlie,43.0000,-89.3800
-      D,4,Delta,43.0100,-89.3800
-      C2,5,Charlie South,42.9991,-89.3800
-      E,6,Echo,43.0100,-89.3700
-      F,7,Far,43.1000,-89.3000
-
-      """,
+    "stops.txt": stopsText,
     "trips.txt": trips,
     "stop_times.txt": stopTimes,
     "shapes.txt": """
@@ -70,6 +66,53 @@ private func makePlannerFeed() throws -> Schedule {
   ]
   for (name, text) in files { try Data(text.utf8).write(to: dir.appendingPathComponent(name)) }
   return try Schedule.load(directory: dir)
+}
+
+@Suite struct PlannerAccessibilityTests {
+  private func monday(_ schedule: Schedule, _ h: Int, _ m: Int) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = schedule.timeZone
+    return calendar.date(from: DateComponents(year: 2026, month: 10, day: 5, hour: h, minute: m))!
+  }
+
+  private func point(_ schedule: Schedule, _ id: String) -> PlanPoint {
+    let stop = schedule.stops[id]!
+    return PlanPoint(name: stop.name, coordinate: Coordinate(latitude: stop.latitude, longitude: stop.longitude), stopID: id)
+  }
+
+  @Test func inaccessibleStopsCannotBeUsedForTransfers() throws {
+    // Charlie (the transfer stop) is not accessible: the only wheelchair journey from A to D is the direct bus.
+    let schedule = try makePlannerFeed(stopAccess: ["C": 2])
+    var options = PlanOptions()
+    options.accessibleOnly = true
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), to: point(schedule, "D"), departAt: monday(schedule, 7, 55), options: options)
+    #expect(!journeys.isEmpty)
+    #expect(journeys.allSatisfy { $0.transfers == 0 })
+    // Without the option the transfer journey is still offered.
+    let all = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), to: point(schedule, "D"), departAt: monday(schedule, 7, 55))
+    #expect(all.contains { $0.transfers == 1 })
+  }
+
+  @Test func inaccessibleTripsAreSkipped() throws {
+    let schedule = try makePlannerFeed(tripAccess: ["r3": 2])
+    var options = PlanOptions()
+    options.accessibleOnly = true
+    let journeys = TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), to: point(schedule, "D"), departAt: monday(schedule, 7, 55), options: options)
+    #expect(!journeys.contains { $0.rides.contains { $0.tripID == "r3" } })
+    #expect(journeys.contains { $0.rides.map(\.tripID) == ["r1a", "r2a"] })
+  }
+
+  @Test func unknownAccessibilityIsAllowed() throws {
+    // The feed says nothing (0) about accessibility: the option must not rule everything out.
+    let schedule = try makePlannerFeed()
+    var options = PlanOptions()
+    options.accessibleOnly = true
+    #expect(!TripPlanner(schedule: schedule).plan(
+      from: point(schedule, "A"), to: point(schedule, "D"), departAt: monday(schedule, 7, 55), options: options).isEmpty)
+  }
 }
 
 @Suite struct TripPlannerTests {
@@ -244,5 +287,58 @@ private func makePlannerFeed() throws -> Schedule {
     #expect(lines[0].coordinates.count >= 5)
     #expect(lines[0].coordinates.first == stop("A").coordinate)
     #expect(lines[0].coordinates.last == stop("C").coordinate)
+  }
+
+  @Test func arriveByFindsTheLatestBusThatIsStillInTime() throws {
+    // To arrive at D by 09:30: r1b+r2b arrives 09:25 (leaves 09:00); r1a+r2a arrives 08:25; r3 arrives 09:00.
+    let journeys = planner.plan(from: stop("A"), to: stop("D"), arriveBy: monday(9, 30), earliestStart: monday(7, 0))
+    let best = try #require(journeys.first)
+    #expect(best.arrival <= monday(9, 30))
+    // The latest departure is the 09:00 bus; the journeys are ordered latest first.
+    #expect(best.rides.first?.tripID == "r1b")
+    #expect(best.arrival == monday(9, 25))
+    #expect(zip(journeys, journeys.dropFirst()).allSatisfy { $0.departure >= $1.departure })
+  }
+
+  @Test func arriveByIgnoresJourneysThatAreTooLate() {
+    let journeys = planner.plan(from: stop("A"), to: stop("D"), arriveBy: monday(8, 30), earliestStart: monday(7, 0))
+    #expect(!journeys.isEmpty)
+    #expect(journeys.allSatisfy { $0.arrival <= monday(8, 30) })
+    #expect(!journeys.contains { $0.rides.first?.tripID == "r1b" })
+  }
+
+  @Test func arriveByWithNothingInTimeIsEmpty() {
+    #expect(planner.plan(from: stop("A"), to: stop("D"), arriveBy: monday(7, 30), earliestStart: monday(7, 0)).isEmpty)
+  }
+
+  @Test func limitingRidesRemovesTransferJourneys() {
+    var options = PlanOptions()
+    options.maxRides = 1
+    let journeys = planner.plan(from: stop("A"), to: stop("D"), departAt: monday(7, 55), options: options)
+    #expect(!journeys.isEmpty)
+    #expect(journeys.allSatisfy { $0.transfers == 0 })
+    #expect(journeys.first?.rides.first?.tripID == "r3")
+  }
+
+  @Test func slowerWalkingTakesLonger() throws {
+    let origin = point(43.0, -89.4018, "Home")
+    var slow = PlanOptions()
+    slow.walkSpeed = 0.7
+    let normal = try #require(planner.plan(from: origin, to: stop("C"), departAt: monday(7, 55)).first)
+    let slower = try #require(planner.plan(from: origin, to: stop("C"), departAt: monday(7, 55), options: slow).first)
+    // The walk is shifted to end when the bus leaves, so compare its length.
+    func walkTime(_ journey: Journey) -> TimeInterval {
+      guard case .walk(let walk) = journey.legs[0] else { return 0 }
+      return walk.end.timeIntervalSince(walk.start)
+    }
+    #expect(walkTime(slower) > walkTime(normal) * 1.5)
+  }
+
+  @Test func longerRequiredTransferTimeRulesOutTightConnections() {
+    // r1a reaches C at 08:10 and r2a leaves at 08:15: a 5-minute connection. Asking for 10 minutes rules it out.
+    var options = PlanOptions()
+    options.minTransferSeconds = 600
+    let journeys = planner.plan(from: stop("A"), to: stop("D"), departAt: monday(7, 55), options: options)
+    #expect(!journeys.contains { $0.rides.map(\.tripID) == ["r1a", "r2a"] })
   }
 }

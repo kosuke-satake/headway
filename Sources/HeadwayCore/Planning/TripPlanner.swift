@@ -13,6 +13,8 @@ public struct PlanOptions: Sendable {
   public var minTransferSeconds = 60.0
   /// Largest number of buses in one journey.
   public var maxRides = 4
+  /// Only boards and leaves at stops, and only rides trips, that are not marked as inaccessible to wheelchairs.
+  public var accessibleOnly = false
   /// How far ahead of the departure time to look for buses.
   public var searchWindow: TimeInterval = 4 * 3600
   /// How many journeys to return at most.
@@ -107,6 +109,34 @@ public struct TripPlanner: Sendable {
     return Self.select(journeys, limit: options.maxJourneys)
   }
 
+  /// Journeys that get the rider there by `deadline`, latest departure first.
+  ///
+  /// Runs forward scans, starting two hours before the deadline. After each scan the next one starts just after the
+  /// latest journey that still arrives in time, until a scan finds none. The journeys kept are the ones that leave as
+  /// late as possible and still arrive by the deadline.
+  public func plan(
+    from origin: PlanPoint, to destination: PlanPoint, arriveBy deadline: Date, options: PlanOptions = PlanOptions(),
+    predictions: [TripPrediction] = [], vehicles: [VehicleSample] = [], earliestStart: Date = Date()
+  ) -> [Journey] {
+    var found: [Journey] = []
+    var start = max(earliestStart, deadline.addingTimeInterval(-2 * 3600))
+    for _ in 0..<40 {
+      let batch = plan(
+        from: origin, to: destination, departAt: start, options: options, predictions: predictions, vehicles: vehicles)
+      let inTime = batch.filter { $0.arrival <= deadline }
+      found.append(contentsOf: inTime)
+      // A walk-only journey does not move the search forward; only journeys with a bus do.
+      guard let latest = inTime.filter({ !$0.rides.isEmpty }).max(by: { $0.departure < $1.departure }),
+        let firstRide = latest.rides.first
+      else { break }
+      let next = firstRide.depart.addingTimeInterval(-leadWalk(of: latest) + 30)
+      if next <= start { break }
+      start = next
+    }
+    let chosen = Self.select(found, limit: options.maxJourneys * 2)
+    return Array(chosen.sorted { $0.departure > $1.departure }.prefix(options.maxJourneys))
+  }
+
   /// Seconds the rider walks before the first bus.
   private func leadWalk(of journey: Journey) -> TimeInterval {
     guard case .walk(let walk)? = journey.legs.first else { return 0 }
@@ -199,6 +229,7 @@ public struct TripPlanner: Sendable {
       let base = midnight.timeIntervalSince(start)
       let active = schedule.activeServiceIDs(on: date)
       for trip in schedule.trips.values where active.contains(trip.serviceID) {
+        if options.accessibleOnly, trip.wheelchairAccessible == 2 { continue }
         guard let times = schedule.stopTimes[trip.id], times.count > 1 else { continue }
         if base + Double(times[times.count - 1].arrival) < 0 || base + Double(times[0].departure) > options.searchWindow {
           continue
@@ -259,6 +290,8 @@ public struct TripPlanner: Sendable {
     predictions: [TripPrediction], vehicles: [VehicleSample]
   ) -> [Journey] {
     guard !originAccess.isEmpty, !destinationAccess.isEmpty else { return [] }
+    // With the accessibility option, a stop that is marked inaccessible cannot be boarded at or left at.
+    let usable = stops.map { !options.accessibleOnly || $0.wheelchairBoarding != 2 }
     let (connections, trips) = buildConnections(
       start: start, options: options, stopIndex: stopIndex, predictions: predictions, vehicles: vehicles)
 
@@ -289,12 +322,12 @@ public struct TripPlanner: Sendable {
         if board == nil {
           let label = previous[c.from]
           let slack = label.arrivedByBus ? options.minTransferSeconds : 0
-          if label.arrival + slack <= c.departure {
+          if usable[c.from], label.arrival + slack <= c.departure {
             board = ci
             boarded[c.trip] = ci
           }
         }
-        if let board, c.arrival < current[c.to].arrival {
+        if let board, usable[c.to], c.arrival < current[c.to].arrival {
           current[c.to] = Label(
             arrival: c.arrival, arrivedByBus: true, via: .ride(trip: c.trip, board: board, alight: ci, round: round))
           improved.insert(c.to)

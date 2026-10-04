@@ -82,7 +82,21 @@ struct Preferences: Codable, Equatable {
   var hapticFeedback = true
   var rememberMapPosition = true
 
+  // Trip planner
+  var walkSpeed: WalkSpeed = .normal
+  var maxWalkMeters = 800
+  var maxTransfers = 3
+  /// Time to allow for changing buses, in seconds.
+  var transferSeconds = 60
+  var accessibleOnly = false
+  var journeySort: JourneySort = .departure
+  /// How long before leaving to remind the rider, in minutes.
+  var reminderLeadMinutes = 5
+
   // User data
+  var savedPlaces: [StoredPlace] = []
+  var savedTrips: [SavedTrip] = []
+  var recentTrips: [SavedTrip] = []
   var hiddenRoutes: Set<String> = []
   var favoriteStops: [String] = []
   var favoriteRoutes: [String] = []
@@ -116,6 +130,16 @@ struct Preferences: Codable, Equatable {
     showDelayDetails = value(.showDelayDetails, d.showDelayDetails)
     hapticFeedback = value(.hapticFeedback, d.hapticFeedback)
     rememberMapPosition = value(.rememberMapPosition, d.rememberMapPosition)
+    walkSpeed = value(.walkSpeed, d.walkSpeed)
+    maxWalkMeters = [400, 800, 1200, 2000].contains(value(.maxWalkMeters, d.maxWalkMeters)) ? value(.maxWalkMeters, d.maxWalkMeters) : 800
+    maxTransfers = min(3, max(0, value(.maxTransfers, d.maxTransfers)))
+    transferSeconds = [60, 180, 300].contains(value(.transferSeconds, d.transferSeconds)) ? value(.transferSeconds, d.transferSeconds) : 60
+    accessibleOnly = value(.accessibleOnly, d.accessibleOnly)
+    journeySort = value(.journeySort, d.journeySort)
+    reminderLeadMinutes = [2, 5, 10, 15].contains(value(.reminderLeadMinutes, d.reminderLeadMinutes)) ? value(.reminderLeadMinutes, d.reminderLeadMinutes) : 5
+    savedPlaces = value(.savedPlaces, d.savedPlaces)
+    savedTrips = value(.savedTrips, d.savedTrips)
+    recentTrips = value(.recentTrips, d.recentTrips)
     hiddenRoutes = value(.hiddenRoutes, d.hiddenRoutes)
     favoriteStops = value(.favoriteStops, d.favoriteStops)
     favoriteRoutes = value(.favoriteRoutes, d.favoriteRoutes)
@@ -130,6 +154,8 @@ struct Preferences: Codable, Equatable {
     case updateInterval, smoothBusMovement, estimateBusPositions, pauseLiveInBackground
     case clockFormat, arrivalStyle, showDelayDetails
     case hapticFeedback, rememberMapPosition
+    case walkSpeed, maxWalkMeters, maxTransfers, transferSeconds, accessibleOnly, journeySort, reminderLeadMinutes
+    case savedPlaces, savedTrips, recentTrips
     case hiddenRoutes, favoriteStops, favoriteRoutes, recentStops
     case lastLatitude, lastLongitude, lastZoom
   }

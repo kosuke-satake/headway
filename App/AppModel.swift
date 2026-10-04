@@ -265,10 +265,31 @@ final class AppModel {
 
   // MARK: Journeys
 
-  /// Runs the planner with what the app currently knows.
-  func searchJourneys() async {
-    await plan.search(schedule: schedule, predictions: predictions, vehicles: vehicles, here: location.location)
+  /// The planner's options as set in Settings.
+  func plannerOptions() -> PlanOptions {
+    let prefs = settings.values
+    var options = PlanOptions()
+    options.walkSpeed = prefs.walkSpeed.metersPerSecond
+    options.maxWalkMeters = Double(prefs.maxWalkMeters)
+    options.maxRides = prefs.maxTransfers + 1
+    options.minTransferSeconds = Double(prefs.transferSeconds)
+    options.accessibleOnly = prefs.accessibleOnly
+    return options
   }
+
+  func planContext() -> PlanContext {
+    PlanContext(
+      schedule: schedule, predictions: predictions, vehicles: vehicles, here: location.location, options: plannerOptions())
+  }
+
+  /// Runs the planner with what the app currently knows, and remembers the search.
+  func searchJourneys() async {
+    if let from = plan.from, let to = plan.to { settings.noteRecent(from: from, to: to) }
+    await plan.search(planContext())
+  }
+
+  func loadLaterJourneys() async { await plan.loadLater(planContext()) }
+  func loadEarlierJourneys() async { await plan.loadEarlier(planContext()) }
 
   /// Draws a journey on the map and opens its summary.
   func showOnMap(_ journey: Journey) {

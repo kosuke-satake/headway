@@ -1,4 +1,5 @@
 import Foundation
+import HeadwayCore
 import Observation
 
 /// Observable, persistent user preferences.
@@ -25,11 +26,14 @@ final class AppSettings {
   }
 
   func reset() {
-    // Favourites and recents are the user's own data, not settings: keep them.
+    // Favourites, saved places and trips, and recents are the user's own data, not settings: keep them.
     var fresh = Preferences()
     fresh.favoriteStops = values.favoriteStops
     fresh.favoriteRoutes = values.favoriteRoutes
     fresh.recentStops = values.recentStops
+    fresh.savedPlaces = values.savedPlaces
+    fresh.savedTrips = values.savedTrips
+    fresh.recentTrips = values.recentTrips
     values = fresh
   }
 
@@ -62,5 +66,46 @@ final class AppSettings {
 
   func setRoute(_ id: String, hidden: Bool) {
     if hidden { values.hiddenRoutes.insert(id) } else { values.hiddenRoutes.remove(id) }
+  }
+
+  // MARK: Saved places and trips
+
+  func save(place point: PlanPoint, as kind: PlaceKind, name: String? = nil) {
+    // Home and work exist once: saving a new one replaces the old.
+    if kind != .other { values.savedPlaces.removeAll { $0.kind == kind } }
+    values.savedPlaces.removeAll { $0.kind == .other && StoredEnd(.point(point)).matches(StoredEnd(.point($0.point))) }
+    let label = name ?? (kind == .home ? String(localized: "Home") : kind == .work ? String(localized: "Work") : point.name)
+    var place = StoredPlace(name: label, kind: kind, point: point)
+    place.name = label
+    values.savedPlaces.append(place)
+  }
+
+  func place(of kind: PlaceKind) -> StoredPlace? { values.savedPlaces.first { $0.kind == kind } }
+
+  func savedPlace(matching point: PlanPoint) -> StoredPlace? {
+    values.savedPlaces.first { StoredEnd(.point($0.point)).matches(StoredEnd(.point(point))) }
+  }
+
+  func removePlace(_ id: String) { values.savedPlaces.removeAll { $0.id == id } }
+
+  func isSaved(from: PlaceChoice, to: PlaceChoice) -> Bool {
+    let f = StoredEnd(from), t = StoredEnd(to)
+    return values.savedTrips.contains { $0.matches(from: f, to: t) }
+  }
+
+  func toggleSaved(from: PlaceChoice, to: PlaceChoice) {
+    let f = StoredEnd(from), t = StoredEnd(to)
+    if let index = values.savedTrips.firstIndex(where: { $0.matches(from: f, to: t) }) {
+      values.savedTrips.remove(at: index)
+    } else {
+      values.savedTrips.append(SavedTrip(from: f, to: t))
+    }
+  }
+
+  func noteRecent(from: PlaceChoice, to: PlaceChoice) {
+    let f = StoredEnd(from), t = StoredEnd(to)
+    var recents = values.recentTrips.filter { !$0.matches(from: f, to: t) }
+    recents.insert(SavedTrip(from: f, to: t), at: 0)
+    values.recentTrips = Array(recents.prefix(10))
   }
 }
