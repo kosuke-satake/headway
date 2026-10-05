@@ -50,7 +50,12 @@ struct SearchSheet: View {
           }
         }
         Spacer(minLength: 8)
-        if !stop.code.isEmpty { Text(stop.code).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+        VStack(alignment: .trailing, spacing: 2) {
+          if let side = Compass.bound(stop.facing) {
+            Label(side, systemImage: Compass.symbol(stop.facing)).font(.caption).foregroundStyle(.secondary)
+          }
+          if !stop.code.isEmpty { Text(stop.code).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+        }
       }
       .contentShape(Rectangle())
     }

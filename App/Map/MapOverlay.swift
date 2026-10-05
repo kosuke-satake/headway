@@ -10,7 +10,7 @@ import HeadwayCore
 struct MapOverlayData: Codable, Equatable, Sendable {
   /// Raise this whenever what the overlay holds, or how it is computed (for example the bundling of lanes), changes: a
   /// saved copy of an older version is then ignored and rebuilt from the timetable.
-  static let currentVersion = 5
+  static let currentVersion = 7
 
   struct RouteInfo: Codable, Equatable, Sendable {
     var id: String
@@ -38,6 +38,8 @@ struct MapOverlayData: Codable, Equatable, Sendable {
     var code: String
     var latitude: Double
     var longitude: Double
+    /// Bearing the stop faces, which is the way its buses go (the feed's `cardinal_direction`).
+    var facing: Int? = nil
   }
 
   var version = MapOverlayData.currentVersion
@@ -78,7 +80,7 @@ struct MapOverlayData: Codable, Equatable, Sendable {
       Line(route: $0.route, direction: -1, lane: $0.lane, latitudes: $0.coordinates.map(\.latitude), longitudes: $0.coordinates.map(\.longitude))
     }
     stops = schedule.stops.values.sorted { $0.id < $1.id }.map {
-      StopInfo(id: $0.id, name: $0.name, code: $0.code, latitude: $0.latitude, longitude: $0.longitude)
+      StopInfo(id: $0.id, name: $0.name, code: $0.code, latitude: $0.latitude, longitude: $0.longitude, facing: $0.facing)
     }
     self.network = network
   }
@@ -105,7 +107,13 @@ final class MapOverlay: Equatable, @unchecked Sendable {
   var feedVersion: String { data.feedVersion }
   var network: RouteNetwork { data.network }
 
-  static func == (a: MapOverlay, b: MapOverlay) -> Bool { a.feedVersion == b.feedVersion && a.data.version == b.data.version }
+  /// The timetable and the way the overlay was computed: when either changes, the map rebuilds its layers.
+  var identity: String { "\(data.feedVersion)#\(data.version)" }
+
+  /// True when the overlay was computed by an older version of the app and should be computed again.
+  var isOutdated: Bool { data.version != MapOverlayData.currentVersion }
+
+  static func == (a: MapOverlay, b: MapOverlay) -> Bool { a.identity == b.identity }
 
   /// All the coordinates of a route's lines (in one direction, or both), thinned so that a camera fit stays cheap.
   func coordinates(route: String, direction: Int?) -> [Coordinate] {
@@ -126,10 +134,11 @@ enum OverlayStore {
       .appendingPathComponent("map-overlay.plist")
   }
 
+  /// The saved copy, even one computed by an older version of the app: an old drawing is better than an empty map while
+  /// the new one is computed.
   static func load() -> MapOverlay? {
     guard let url, let bytes = try? Data(contentsOf: url),
-      let data = try? PropertyListDecoder().decode(MapOverlayData.self, from: bytes),
-      data.version == MapOverlayData.currentVersion
+      let data = try? PropertyListDecoder().decode(MapOverlayData.self, from: bytes)
     else { return nil }
     return MapOverlay(data)
   }

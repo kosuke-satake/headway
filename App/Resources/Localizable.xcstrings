@@ -4027,6 +4027,17 @@
           }
         }
       }
+    },
+    "%@ · Stop %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · バス停 %2$@"
+          }
+        }
+      }
     }
   }
 }

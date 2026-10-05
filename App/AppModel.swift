@@ -177,6 +177,24 @@ final class AppModel {
     }
   }
 
+  /// Which way buses go at a stop ("Southbound"), when the feed says.
+  func stopSide(_ id: String?) -> String? {
+    guard let id else { return nil }
+    return Compass.bound(schedule?.stops[id]?.facing ?? overlay?.stops[id]?.facing)
+  }
+
+  /// The direction of a trip in words ("Southbound"), from the feed's direction name.
+  func tripDirection(_ tripID: String) -> String? {
+    guard let trip = schedule?.trips[tripID], !trip.directionName.isEmpty else { return nil }
+    return Self.compassName(trip.directionName)
+  }
+
+  /// A stop's name with the way its buses go, to tell apart the two stops of the same name on either side of a street.
+  func stopTitle(_ point: PlanPoint) -> String {
+    guard let side = stopSide(point.stopID) else { return point.name }
+    return "\(point.name) (\(side))"
+  }
+
   /// The ways a route runs (one entry per direction).
   func variants(of route: String) -> [RouteVariant] { overlay?.network.variants(of: route) ?? [] }
 
@@ -553,7 +571,7 @@ final class AppModel {
         url = Self.cacheURL
       }
       guard let url else { throw URLError(.fileDoesNotExist) }
-      try await apply(try await Self.parse(url))
+      try await apply(try await Self.parse(url, current: overlay))
       phase = .ready
       Task { _ = await refreshFromNetwork(force: false) }
     } catch {
@@ -563,21 +581,25 @@ final class AppModel {
 
   private struct Parsed {
     let schedule: Schedule
-    let overlay: MapOverlayData
+    /// Nil when the drawing the map already has is for this timetable and current.
+    let overlay: MapOverlayData?
   }
 
-  private static func parse(_ url: URL) async throws -> Parsed {
+  /// Parses a timetable, and computes the map's drawing for it unless `current` (the drawing the map has) already fits:
+  /// laying out the lanes takes a moment, so it is done once per timetable, not on every launch.
+  private static func parse(_ url: URL, current: MapOverlay? = nil) async throws -> Parsed {
     let schedule = try await Task.detached(priority: .userInitiated) { try Schedule.load(zipAt: url) }.value
+    if let current, current.feedVersion == schedule.feedVersion, !current.isOutdated {
+      return Parsed(schedule: schedule, overlay: nil)
+    }
     let overlay = await Task.detached(priority: .utility) { MapOverlayData(schedule: schedule, network: RouteNetwork(schedule: schedule)) }.value
     return Parsed(schedule: schedule, overlay: overlay)
   }
 
   private func apply(_ parsed: Parsed) async throws {
     schedule = parsed.schedule
-    // The map keeps what it has when the new timetable describes the same feed; otherwise it is rebuilt and saved.
-    if overlay?.feedVersion != parsed.overlay.feedVersion {
-      overlay = MapOverlay(parsed.overlay)
-      let data = parsed.overlay
+    if let data = parsed.overlay {
+      overlay = MapOverlay(data)
       Task.detached(priority: .utility) { OverlayStore.save(data) }
     }
     vehicleDirections = directions(of: vehicles)
@@ -632,7 +654,7 @@ final class AppModel {
         return .upToDate
       }
       guard http.statusCode == 200 else { return .failed }
-      let fresh = try await Self.parse(temporary)
+      let fresh = try await Self.parse(temporary, current: overlay)
       remember(http, in: defaults)
       if fresh.schedule.feedVersion == schedule?.feedVersion {
         try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cache.path)
@@ -788,7 +810,7 @@ final class AppModel {
   /// One check from the background: loads what is needed, looks, and goes back to sleep.
   func runBackgroundWatch() async {
     guard settings.values.watchEnabled, !settings.values.watchedRoutes.isEmpty else { return }
-    if schedule == nil, let url = startingZip() { try? await apply(try await Self.parse(url)) }
+    if schedule == nil, let url = startingZip() { try? await apply(try await Self.parse(url, current: overlay)) }
     guard schedule != nil else { return }
     if let snapshot = try? await client.fetch(.vehicles) { vehicles = snapshot.vehicles }
     if let snapshot = try? await client.fetch(.trips) { predictions = snapshot.predictions }

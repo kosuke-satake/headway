@@ -560,7 +560,7 @@ struct JourneyDetailView: View {
   }
 
   var body: some View {
-    let summary = JourneySummary(text: model.timeText(), routeName: { model.route($0)?.shortName ?? $0 })
+    let summary = JourneySummary(text: model.timeText(), routeName: { model.route($0)?.shortName ?? $0 }, stopName: { model.stopTitle($0) })
     List {
       Section { JourneySteps(journey: journey) }
       Section {
@@ -640,8 +640,8 @@ struct JourneySteps: View {
             VStack(alignment: .leading, spacing: 3) {
               Text("Route \(model.route(ride.routeID)?.shortName ?? ride.routeID) to \(ride.headsign.prettyHeadsign)")
                 .font(.subheadline.weight(.semibold))
-              Text("Board at \(ride.fromStop.name) · \(text.clock(ride.depart))").font(.footnote)
-              Text("Get off at \(ride.toStop.name) · \(text.clock(ride.arrive))").font(.footnote)
+              Text("Board at \(model.stopTitle(ride.fromStop)) · \(text.clock(ride.depart))").font(.footnote)
+              Text("Get off at \(model.stopTitle(ride.toStop)) · \(text.clock(ride.arrive))").font(.footnote)
               HStack(spacing: 8) {
                 Text("\(ride.stopCount) stops").foregroundStyle(.secondary)
                 if ride.isLive {

@@ -29,36 +29,40 @@ public struct BundledLine: Sendable, Equatable {
 }
 
 /// Lays out an overview of all routes: one line per route (its directions and variants merged where they run along the
-/// same streets) and, where routes share a street, a lane for each, side by side.
+/// same streets) and, where routes share a street, a lane for each, side by side on one shared centre line.
 ///
 /// 1. Each route's shapes are merged: the longest is kept whole, and of the others only the parts more than `merge`
 ///    metres away from what is kept (a one-way street used in one direction only, a branch). Spikes out to a stop and
 ///    back are removed first.
-/// 2. At every point of every line, the routes whose lines run within `corridor` metres and roughly parallel (within 30
-///    degrees) form the bundle there. Each gets a lane by its order in the route list, centred on the street. The side
-///    is measured against the bundle's first route, so that two routes running against each other still end up on
-///    their own sides.
-/// 3. Lanes are smoothed along each line (a majority over about 100 m, and no lane kept for less than `minRun` points),
-///    and a change of lane is spread over `ramp` steps, so that the lines do not jump.
+/// 2. The lines are laid onto a shared skeleton, route by route: where a line runs within `snap` metres of skeleton that
+///    is already there, and roughly parallel to it, it follows that skeleton exactly; elsewhere its own points become new
+///    skeleton. Every route on a street therefore follows the very same centre line, so that their lanes are parallel
+///    (each feed draws the same street a few metres differently, which made lanes wobble).
+/// 3. Each piece of skeleton knows the routes that use it. Each gets a lane by its order in the route list, centred on
+///    the street, on the side measured against the skeleton's own direction, so that a route running the other way
+///    keeps its side.
+/// 4. Lanes are smoothed along each route (no lane kept for less than `minRun` pieces) and a change of lane is spread
+///    over `ramp` pieces.
 public enum RouteBundler {
   public static func overview(
-    _ shapes: [BundleInput], step: Double = 20, merge: Double = 30, corridor: Double = 22, minRun: Int = 8, ramp: Int = 3
+    _ shapes: [BundleInput], step: Double = 10, merge: Double = 30, snap: Double = 18, minRun: Int = 12, ramp: Int = 6
   ) -> [BundledLine] {
     let all = shapes.flatMap(\.points)
     guard !all.isEmpty else { return [] }
     let frame = Frame(latitude: all.map(\.latitude).reduce(0, +) / Double(all.count))
     let orderOfRoute = Dictionary(shapes.map { ($0.route, $0.order) }, uniquingKeysWith: min)
+    func ordered(_ a: String, _ b: String) -> Bool { (orderOfRoute[a] ?? .max, a) < (orderOfRoute[b] ?? .max, b) }
 
     // 1. One merged set of lines per route.
     var lines: [(route: String, points: [Point])] = []
     let byRoute = Dictionary(grouping: shapes, by: \.route)
-    for route in byRoute.keys.sorted(by: { (orderOfRoute[$0] ?? .max, $0) < (orderOfRoute[$1] ?? .max, $1) }) {
+    for route in byRoute.keys.sorted(by: ordered) {
       let candidates = byRoute[route]!
         .map { despike($0.points.map(frame.point)) }
         .map { densify($0, step: step) }
         .filter { $0.count > 1 }
         .sorted { length($0) > length($1) }
-      var kept = SegmentIndex(cell: max(merge, corridor) * 2)
+      var kept = SegmentIndex(cell: merge * 2)
       for points in candidates {
         if kept.isEmpty {
           kept.insert(points, line: lines.count)
@@ -85,46 +89,230 @@ public enum RouteBundler {
       }
     }
 
-    // 2. The bundle at every point.
-    var everything = SegmentIndex(cell: max(merge, corridor) * 2)
-    for (index, line) in lines.enumerated() { everything.insert(line.points, line: index) }
-    var values: [[Double]] = []
-    for (index, line) in lines.enumerated() {
+    // 2. The shared skeleton, and each line as a walk along it.
+    var skeleton: [[Point]] = []
+    var index = SegmentIndex(cell: max(snap * 2, 40))
+    var walks: [(route: String, positions: [Position])] = []
+    for line in lines {
       let points = line.points
-      var lanes: [Double] = []
-      for segment in 0..<(points.count - 1) {
-        let here = midpoint(points[segment], points[segment + 1])
-        let way = unit(points[segment], points[segment + 1])
-        // Other routes along the same line nearby, with the direction of their line there.
-        var members: [String: Point] = [line.route: way]
-        for hit in everything.near(here, within: corridor) {
-          let other = lines[hit.line]
-          guard hit.line != index, other.route != line.route, members[other.route] == nil else { continue }
-          let theirs = unit(other.points[hit.segment], other.points[hit.segment + 1])
-          if abs(dot(way, theirs)) >= parallel { members[other.route] = theirs }
+      var snapped: [Position?] = points.indices.map { i in
+        let way = tangent(points, i)
+        var best: (position: Position, distance: Double)?
+        for hit in index.near(points[i], within: snap) {
+          let a = skeleton[hit.line][hit.segment], b = skeleton[hit.line][hit.segment + 1]
+          guard abs(dot(way, unit(a, b))) >= parallel else { continue }
+          let (t, d) = project(points[i], a, b)
+          if best == nil || d < best!.distance { best = (Position(line: hit.line, segment: hit.segment, t: t), d) }
         }
-        let sorted = members.keys.sorted { (orderOfRoute[$0] ?? .max, $0) < (orderOfRoute[$1] ?? .max, $1) }
-        let rank = Double(sorted.firstIndex(of: line.route)!)
-        let base = rank - Double(sorted.count - 1) / 2
-        let reference = members[sorted[0]]!
-        lanes.append(base * (dot(way, reference) >= 0 ? 1 : -1))
+        return best?.position
       }
-      values.append(lanes)
+      // A point or two that does not snap between points that do is noise (a stop a little off the street), and a point
+      // or two that snaps between points that do not is a crossing: neither changes what the line does.
+      snapped = cleaned(snapped, points: points, skeleton: skeleton, index: index, snap: snap)
+
+      var positions: [Position] = []
+      var i = 0
+      while i < points.count {
+        if let position = snapped[i] {
+          positions.append(position)
+          i += 1
+          continue
+        }
+        var end = i
+        while end < points.count, snapped[end] == nil { end += 1 }
+        // A stretch on its own becomes skeleton, joined to the skeleton points before and after it.
+        var piece: [Point] = []
+        if let before = positions.last { piece.append(location(before, skeleton)) }
+        piece += points[i..<end]
+        if end < points.count, let after = snapped[end] { piece.append(location(after, skeleton)) }
+        let id = skeleton.count
+        skeleton.append(piece)
+        index.insert(piece, line: id)
+        let first = positions.isEmpty ? 0 : 1
+        for vertex in first..<(first + (end - i)) {
+          positions.append(Position(line: id, segment: min(vertex, piece.count - 2), t: vertex == piece.count - 1 ? 1 : 0))
+        }
+        i = end
+      }
+      walks.append((line.route, positions))
     }
 
-    // 3. Smooth, ramp and cut into runs.
+    // 3. Who uses each piece of skeleton, and in which direction; then each route's pieces in order.
+    struct Piece {
+      var from: Point
+      var to: Point
+      var key: Int?  // skeleton line << 32 | segment; nil for a short link between two skeleton lines
+      var sign: Double
+    }
+    var users: [Int: [String: Double]] = [:]  // route -> the direction of its first pass (1 along the skeleton, -1 against)
+    var routePieces: [(route: String, pieces: [Piece])] = []
+    for walk in walks {
+      var pieces: [Piece] = []
+      for (p, q) in zip(walk.positions, walk.positions.dropFirst()) {
+        guard p.line == q.line else {
+          pieces.append(Piece(from: location(p, skeleton), to: location(q, skeleton), key: nil, sign: 1))
+          continue
+        }
+        let line = skeleton[p.line]
+        let forward = (q.segment, q.t) >= (p.segment, p.t)
+        var stops: [(point: Point, segment: Int)] = [(location(p, skeleton), p.segment)]
+        if forward {
+          if q.segment > p.segment { for vertex in (p.segment + 1)...q.segment { stops.append((line[vertex], vertex)) } }
+        } else if p.segment > q.segment {
+          for vertex in stride(from: p.segment, through: q.segment + 1, by: -1) { stops.append((line[vertex], vertex - 1)) }
+        }
+        stops.append((location(q, skeleton), q.segment))
+        for (a, b) in zip(stops, stops.dropFirst()) where distance(a.point, b.point) > 0.01 {
+          let segment = forward ? a.segment : b.segment
+          let key = p.line << 32 | segment
+          if users[key, default: [:]][walk.route] == nil { users[key, default: [:]][walk.route] = forward ? 1 : -1 }
+          pieces.append(Piece(from: a.point, to: b.point, key: key, sign: forward ? 1 : -1))
+        }
+      }
+      routePieces.append((walk.route, pieces))
+    }
+
+    // 4. Lanes, smoothed, eased from one to the next, and cut into runs.
     var result: [BundledLine] = []
-    for (index, line) in lines.enumerated() {
-      let smoothed = ramped(stable(majority(values[index], radius: 2), minRun: minRun), steps: ramp)
+    for (route, pieces) in routePieces where !pieces.isEmpty {
+      var values: [Double] = []
+      for piece in pieces {
+        guard let key = piece.key, let routes = users[key] else {
+          values.append(values.last ?? 0)
+          continue
+        }
+        let sorted = routes.keys.sorted(by: ordered)
+        let lane = Double(sorted.firstIndex(of: route)!) - Double(sorted.count - 1) / 2
+        // Sides are counted along the way the bundle's first route goes, so that the order of the routes is the same
+        // whichever way the skeleton line happens to run.
+        values.append(lane * piece.sign * routes[sorted[0]]!)
+      }
+      let target = stable(values, minRun: minRun)
+
+      // Pieces with their offsets; a change of lane is spread over `ramp` pieces, each cut in `split` small steps, so
+      // that the line slides across instead of jumping.
+      // Near a turn the change is made at once instead: sliding sideways while turning draws hooks, and the corner hides
+      // the step.
+      let split = 4
+      let headings = pieces.map { unit($0.from, $0.to) }
+      func turnsNear(_ index: Int, _ count: Int) -> Bool {
+        let low = max(1, index - 3), high = min(pieces.count - 1, index + count + 1)
+        guard low <= high else { return false }
+        for k in low...high where dot(headings[k], headings[k - 1]) < cos(35.0 * .pi / 180) { return true }
+        return false
+      }
+      var drawn: [(from: Point, to: Point, lane: Double)] = []
+      var i = 0
+      while i < pieces.count {
+        if i > 0, target[i] != target[i - 1], !turnsNear(i, ramp) {
+          let a = target[i - 1], b = target[i]
+          var n = 0
+          while n < ramp, i + n < pieces.count, target[i + n] == b { n += 1 }
+          let steps = Double(n * split)
+          var step = 0.0
+          for k in i..<(i + n) {
+            for part in 0..<split {
+              step += 1
+              let from = lerp(pieces[k].from, pieces[k].to, Double(part) / Double(split))
+              let to = lerp(pieces[k].from, pieces[k].to, Double(part + 1) / Double(split))
+              drawn.append((from, to, a + (b - a) * step / steps))
+            }
+          }
+          i += n
+          continue
+        }
+        drawn.append((pieces[i].from, pieces[i].to, target[i]))
+        i += 1
+      }
+
       var start = 0
-      for segment in 1...smoothed.count {
-        if segment == smoothed.count || smoothed[segment] != smoothed[start] {
-          let points = line.points[start...segment].map(frame.coordinate)
-          result.append(BundledLine(route: line.route, lane: smoothed[start], coordinates: points))
-          start = segment
+      for position in 1...drawn.count {
+        if position == drawn.count || drawn[position].lane != drawn[start].lane {
+          var points = [drawn[start].from]
+          for piece in drawn[start..<position] { points.append(piece.to) }
+          result.append(BundledLine(route: route, lane: drawn[start].lane, coordinates: dedupe(points).map(frame.coordinate)))
+          start = position
         }
       }
     }
+    return result.filter { $0.coordinates.count > 1 }
+  }
+
+  private static func lerp(_ a: Point, _ b: Point, _ t: Double) -> Point { Point(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t) }
+
+  /// A place on the skeleton: on `segment` of skeleton line `line`, `t` of the way along it.
+  struct Position {
+    var line: Int
+    var segment: Int
+    var t: Double
+  }
+
+  private static func location(_ position: Position, _ skeleton: [[Point]]) -> Point {
+    let a = skeleton[position.line][position.segment], b = skeleton[position.line][position.segment + 1]
+    return Point(x: a.x + (b.x - a.x) * position.t, y: a.y + (b.y - a.y) * position.t)
+  }
+
+  /// Where `p` falls on the segment from `a` to `b` (0...1), and how far it is from it.
+  private static func project(_ p: Point, _ a: Point, _ b: Point) -> (t: Double, distance: Double) {
+    let dx = b.x - a.x, dy = b.y - a.y
+    let lengthSquared = dx * dx + dy * dy
+    guard lengthSquared > 0 else { return (0, distance(p, a)) }
+    let t = max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared))
+    return (t, distance(p, Point(x: a.x + t * dx, y: a.y + t * dy)))
+  }
+
+  /// The direction of a line at point `i`, from its neighbours.
+  private static func tangent(_ points: [Point], _ i: Int) -> Point {
+    unit(points[max(0, i - 1)], points[min(points.count - 1, i + 1)])
+  }
+
+  /// Short gaps in snapping are filled, and short snapped blips are dropped.
+  ///
+  /// A gap of up to 8 points (about 80 m) between two points on the same skeleton line is a bus bay or a loop into a
+  /// stop: the line simply follows the skeleton there. Other gaps of up to 3 points are filled from a little farther
+  /// away. A snapped blip of up to 3 points between unsnapped ones is a crossing street, not a shared one.
+  private static func cleaned(_ snapped: [Position?], points: [Point], skeleton: [[Point]], index: SegmentIndex, snap: Double) -> [Position?] {
+    var result = snapped
+    var i = 0
+    while i < result.count {
+      let isSnapped = result[i] != nil
+      var end = i
+      while end < result.count, (result[end] != nil) == isSnapped { end += 1 }
+      let inside = i > 0 && end < result.count
+      if inside, isSnapped, end - i <= 3 {
+        for k in i..<end { result[k] = nil }
+      } else if inside, !isSnapped, let before = result[i - 1], let after = result[end], before.line == after.line, end - i <= 8 {
+        let line = skeleton[before.line]
+        let low = min(before.segment, after.segment), high = max(before.segment, after.segment)
+        for k in i..<end {
+          var best: (position: Position, distance: Double)?
+          for segment in low...high {
+            let (t, d) = project(points[k], line[segment], line[segment + 1])
+            if best == nil || d < best!.distance { best = (Position(line: before.line, segment: segment, t: t), d) }
+          }
+          if let best, best.distance <= 50 { result[k] = best.position }
+        }
+      } else if inside, !isSnapped, end - i <= 3 {
+        for k in i..<end {
+          let way = tangent(points, k)
+          var best: (position: Position, distance: Double)?
+          for hit in index.near(points[k], within: snap * 1.7) {
+            let a = skeleton[hit.line][hit.segment], b = skeleton[hit.line][hit.segment + 1]
+            guard abs(dot(way, unit(a, b))) >= parallel else { continue }
+            let (t, d) = project(points[k], a, b)
+            if d <= snap * 1.7, best == nil || d < best!.distance { best = (Position(line: hit.line, segment: hit.segment, t: t), d) }
+          }
+          if let best { result[k] = best.position }
+        }
+      }
+      i = end
+    }
+    return result
+  }
+
+  private static func dedupe(_ points: [Point]) -> [Point] {
+    var result: [Point] = []
+    for point in points where result.last.map({ distance($0, point) > 0.01 }) ?? true { result.append(point) }
     return result
   }
 

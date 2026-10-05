@@ -157,7 +157,7 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     }
     if new.locationAuthorized != old.locationAuthorized { mapView.showsUserLocation = new.locationAuthorized }
 
-    if let overlay = new.overlay, appliedOverlay != nil, appliedOverlay != overlay.feedVersion, new.isDark == old.isDark {
+    if let overlay = new.overlay, appliedOverlay != nil, appliedOverlay != overlay.identity, new.isDark == old.isDark {
       // A new timetable replaced the one the layers were built from: build them again.
       layers = nil
       appliedOverlay = nil
@@ -205,7 +205,7 @@ final class MapCoordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDel
     guard let overlay = state.overlay else { return }
     let built = MapLayers(style: style, overlay: overlay)
     layers = built
-    appliedOverlay = overlay.feedVersion
+    appliedOverlay = overlay.identity
     built.applyStyle(state)
     built.applyJourneyStyle(state)
     built.setJourney(state)

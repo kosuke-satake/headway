@@ -28,6 +28,7 @@ final class MapLayers {
   private let favoriteLayer: MLNCircleStyleLayer
   private let selectedStopLayer: MLNCircleStyleLayer
   private let stopNames: MLNSymbolStyleLayer
+  private let stopArrows: MLNSymbolStyleLayer
   private let highlightStopLayer: MLNCircleStyleLayer
   private let arrowLayer: MLNSymbolStyleLayer
   private let lateLayer: MLNCircleStyleLayer
@@ -137,6 +138,11 @@ final class MapLayers {
 
     stopNames = MLNSymbolStyleLayer(identifier: "stop-names", source: stopSource)
     style.addLayer(stopNames)
+    // A small arrow next to each stop, pointing the way its buses go: the stops of the same name on either side of a
+    // street serve opposite directions.
+    stopArrows = MLNSymbolStyleLayer(identifier: "stop-arrows", source: stopSource)
+    stopArrows.predicate = NSPredicate(format: "rotate != nil")
+    style.addLayer(stopArrows)
 
     selectedBusLayer = MLNCircleStyleLayer(identifier: "selected-bus", source: selectedBusSource)
     style.addLayer(selectedBusLayer)
@@ -318,6 +324,16 @@ final class MapLayers {
     selectedStopLayer.circleStrokeWidth = NSExpression(forConstantValue: 3)
     selectedStopLayer.circleRadius = Self.ramp([10: 7, 14: 10, 17: 14])
 
+    stopArrows.isVisible = prefs.stopVisibility != .hidden
+    stopArrows.minimumZoomLevel = 14.5
+    stopArrows.iconImageName = NSExpression(forConstantValue: "route-arrow")
+    stopArrows.iconRotation = NSExpression(forKeyPath: "rotate")
+    stopArrows.iconRotationAlignment = NSExpression(forConstantValue: "map")
+    stopArrows.iconOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 16, dy: 0)))
+    stopArrows.iconScale = Self.ramp([14.5: 0.45, 17: 0.7])
+    stopArrows.iconAllowsOverlap = NSExpression(forConstantValue: true)
+    stopArrows.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+
     stopNames.isVisible = prefs.showStopNames && prefs.stopVisibility != .hidden
     stopNames.minimumZoomLevel = 15
     stopNames.text = NSExpression(forKeyPath: "name")
@@ -427,7 +443,10 @@ final class MapLayers {
       }
       let point = MLNPointFeature()
       point.coordinate = CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)
-      point.attributes = ["id": stop.id, "name": stop.name]
+      var attributes: [String: Any] = ["id": stop.id, "name": stop.name]
+      // The arrow image points east (90 degrees); the map turns it to the stop's bearing.
+      if let facing = stop.facing { attributes["rotate"] = Double(facing - 90) }
+      point.attributes = attributes
       features.append(point)
     }
     stopSource.shape = MLNShapeCollectionFeature(shapes: features)

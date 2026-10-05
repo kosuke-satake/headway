@@ -62,6 +62,19 @@ import Testing
     #expect(lane(result, "B", at: -89.374) == 0)
   }
 
+  @Test func routesOnOneStreetFollowOneCentreLine() {
+    // The feed draws B about 8 m north of A on the same street. B must follow A's line exactly, or its lane wobbles.
+    let result = RouteBundler.overview([
+      input("A", order: 1, street(-89.400, -89.380)),
+      input("B", order: 2, street(-89.400, -89.380, latitude: 43.00007)),
+    ])
+    let b = lines(result, "B").flatMap(\.coordinates)
+    #expect(!b.isEmpty)
+    #expect(b.allSatisfy { abs($0.latitude - 43.0) < 0.000002 }, "B lies on A's centre line")
+    #expect(lane(result, "A", at: -89.39) == -0.5)
+    #expect(lane(result, "B", at: -89.39) == 0.5)
+  }
+
   @Test func aRouteRunningTheOtherWayKeepsItsSide() {
     // B runs west on A's street: in B's own direction its side is the other one, so its lane has the opposite sign.
     let result = RouteBundler.overview([

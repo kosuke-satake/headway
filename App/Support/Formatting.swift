@@ -126,3 +126,28 @@ extension TimeText {
     return a == b ? nil : "\(a)–\(b)"
   }
 }
+
+/// Which way buses go at a stop, from the feed's `cardinal_direction` (the bearing the stop faces).
+enum Compass {
+  /// "Southbound" for 180 degrees (to the nearest quarter).
+  static func bound(_ degrees: Int?) -> String? {
+    guard let degrees else { return nil }
+    switch ((degrees % 360 + 360) % 360 + 45) / 90 % 4 {
+    case 0: return String(localized: "Northbound")
+    case 1: return String(localized: "Eastbound")
+    case 2: return String(localized: "Southbound")
+    default: return String(localized: "Westbound")
+    }
+  }
+
+  /// An arrow pointing the same way.
+  static func symbol(_ degrees: Int?) -> String {
+    guard let degrees else { return "mappin" }
+    switch ((degrees % 360 + 360) % 360 + 45) / 90 % 4 {
+    case 0: return "arrow.up"
+    case 1: return "arrow.right"
+    case 2: return "arrow.down"
+    default: return "arrow.left"
+    }
+  }
+}

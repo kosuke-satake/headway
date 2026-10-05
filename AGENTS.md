@@ -36,13 +36,19 @@ The author's general workspace rules (outside this repository) apply too; this f
     every route from it at once while the timetable parses behind it (Debug builds parse in about 3.5 s, Release in about
     0.35 s on a Mac), so the map is never blank. `MapState.overlay` is what is drawn; `schedule` is only used to move buses
     between reports.
-  - Lanes: `Sources/HeadwayCore/RouteBundling.swift` (`RouteBundler`) puts routes that share a street side by side. Shapes
-    are subdivided to 20 m; a cell of 3e-4 degrees holds the routes that pass along the same line (passes within 30
-    degrees of parallel); each gets a lane centred on the street; the sign follows a global "right of bearing 156"
-    convention so that both directions of a route land in one lane. The result is cut into runs of one lane and drawn
-    with a data-driven `line-offset` (`lane` times a step that grows with zoom; the product must sit inside the zoom curve's
-    stops or MapLibre raises an exception). Lanes are only used when nothing is in focus. Raise
-    `MapOverlayData.currentVersion` whenever this changes, or the old saved copy is used.
+  - Lanes: `Sources/HeadwayCore/RouteBundling.swift` (`RouteBundler.overview`) draws the network view. Each route's shapes
+    are merged into one line (directions and variants within 30 m; one-way stretches farther apart stay separate), spikes
+    to stops are removed, and the lines are laid onto a shared skeleton: a line within 18 m of skeleton already there and
+    parallel to it follows that skeleton exactly, so all routes on a street share one centre line (the feed draws each
+    a few metres apart, which made lanes wobble). Each skeleton piece knows its routes; lanes go by route order, sides
+    are counted along the bundle's first route, runs shorter than about 120 m are dropped, and changes slide over about
+    60 m in small steps (or happen at once near a turn). Drawn with a data-driven `line-offset` (the product of `lane`
+    and the zoom curve must sit inside the curve's stops or MapLibre raises an exception). A focused route uses the
+    per-direction shapes instead (`kind` "d" versus "o"). `feedanalysis overview <zip> <out.geojson>` exports the layout
+    to look at in a browser. Raise `MapOverlayData.currentVersion` when this changes; an older saved copy is still drawn
+    until the new one is computed (about 0.4 s in a Release build on a Mac, once per timetable).
+  - Stops: `cardinal_direction` in stops.txt gives the way each stop's buses go; the stop sheet, search, planner steps,
+    the timetable and an arrow beside each stop on the map show it (`Compass`, `AppModel.stopSide`).
   - `Sources/HeadwayCore/ServiceOutlook.swift` (today's first/last trip and the next trip of a route and direction),
     `App/Support/RouteStatusText.swift` (the wording), `Planning/MultiStop.swift` (a trip through up to three stops with
     stay times; each part is planned from the end of the previous one plus the stay, and backwards for "arrive by").

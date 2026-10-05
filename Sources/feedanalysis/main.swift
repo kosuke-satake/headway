@@ -99,6 +99,36 @@ case "variants":
   let schedule = try Schedule.load(zipAt: scheduleZip(directory))
   print(try Variants(schedule: schedule, recordings: try Recordings(directory: directory)).markdown(route: arguments[3]))
 
+case "overview":
+  // feedanalysis overview <recordings-root or mmt_gtfs.zip> <output.geojson>
+  // The network view's lines with their lanes, to look at the layout outside the app (tools/preview/overview.html).
+  guard arguments.count >= 4 else { fail("usage: feedanalysis overview <dir or zip> <output.geojson>") }
+  let zip = directory.pathExtension == "zip" ? directory : scheduleZip(directory)
+  let schedule = try Schedule.load(zipAt: zip)
+  var tripOfShape: [String: Trip] = [:]
+  for trip in schedule.trips.values where tripOfShape[trip.shapeID] == nil { tripOfShape[trip.shapeID] = trip }
+  let inputs = schedule.shapes.compactMap { id, points -> BundleInput? in
+    guard let trip = tripOfShape[id], let route = schedule.routes[trip.routeID] else { return nil }
+    return BundleInput(route: route.id, order: route.sortOrder, direction: trip.directionID, shapeID: id, points: points)
+  }
+  let clock = ContinuousClock()
+  var lines: [BundledLine] = []
+  let elapsed = clock.measure { lines = RouteBundler.overview(inputs) }
+  let features: [[String: Any]] = lines.map { line in
+    [
+      "type": "Feature",
+      "properties": ["route": line.route, "lane": line.lane, "color": "#" + (schedule.routes[line.route]?.colorHex ?? "888888")],
+      "geometry": ["type": "LineString", "coordinates": line.coordinates.map { [$0.longitude, $0.latitude] }],
+    ]
+  }
+  let stops: [[String: Any]] = schedule.stops.values.map { stop in
+    ["type": "Feature", "properties": ["name": stop.name, "facing": stop.facing ?? -1],
+     "geometry": ["type": "Point", "coordinates": [stop.longitude, stop.latitude]]]
+  }
+  let collection: [String: Any] = ["type": "FeatureCollection", "features": features + stops]
+  try JSONSerialization.data(withJSONObject: collection).write(to: URL(fileURLWithPath: arguments[3]))
+  print("wrote \(lines.count) pieces and \(stops.count) stops in \(elapsed)")
+
 case "freshness":
   print(try Freshness(recordings: try Recordings(directory: directory)).markdown())
 

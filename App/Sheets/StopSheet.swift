@@ -30,6 +30,11 @@ struct StopSheet: View {
         VStack(alignment: .leading, spacing: 3) {
           Text(stop.name).font(.title3.weight(.semibold)).lineLimit(2)
           HStack(spacing: 6) {
+            // The same name is often used for the stops on both sides of a street: say which side this is.
+            if let side = Compass.bound(stop.facing) {
+              Label(side, systemImage: Compass.symbol(stop.facing)).foregroundStyle(.primary).fontWeight(.semibold)
+              Text("·")
+            }
             if !stop.code.isEmpty { Text("Stop \(stop.code)") }
             if let distance = distance(to: stop) { Text("· \(distance)") }
           }
@@ -93,10 +98,13 @@ struct StopSheet: View {
           Label("No more buses for a while. Service resumes:", systemImage: "moon.zzz")
             .font(.footnote).foregroundStyle(.secondary).listRowSeparator(.hidden)
         }
+        // A stop served in more than one direction (a terminus, a loop) says which way each bus goes.
+        let ways = Dictionary(uniqueKeysWithValues: arrivals.map { ($0.id, model.tripDirection($0.tripID)) })
+        let mixed = Set(ways.values.compactMap { $0 }).count > 1
         TimelineView(.periodic(from: .now, by: 10)) { context in
           VStack(spacing: 0) {
             ForEach(arrivals) { arrival in
-              ArrivalRow(arrival: arrival, now: context.date)
+              ArrivalRow(arrival: arrival, now: context.date, direction: mixed ? ways[arrival.id] ?? nil : nil)
               if arrival.id != arrivals.last?.id { Divider() }
             }
           }
@@ -148,6 +156,8 @@ struct ArrivalRow: View {
   @Environment(AppModel.self) private var model
   let arrival: Arrival
   let now: Date
+  /// The trip's direction ("Southbound"), shown only where a stop is served in more than one direction.
+  var direction: String? = nil
 
   var body: some View {
     let text = model.timeText()
@@ -158,7 +168,10 @@ struct ArrivalRow: View {
         RouteBadge(routeID: arrival.routeID)
         VStack(alignment: .leading, spacing: 2) {
           Text(arrival.headsign.prettyHeadsign).font(.body).lineLimit(1)
-          LiveStatus(arrival: arrival, showDelay: model.settings.values.showDelayDetails)
+          HStack(spacing: 6) {
+            LiveStatus(arrival: arrival, showDelay: model.settings.values.showDelayDetails)
+            if let way = direction { Text("· \(way)").font(.caption).foregroundStyle(.secondary) }
+          }
         }
         Spacer(minLength: 8)
         VStack(alignment: .trailing, spacing: 1) {

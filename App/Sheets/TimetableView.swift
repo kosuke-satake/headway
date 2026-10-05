@@ -13,8 +13,12 @@ struct TimetableView: View {
     let text = model.timeText()
     let departures = loadDepartures()
     let routeIDs = Array(Set(departures.map(\.routeID))).sorted { (model.route($0)?.sortOrder ?? .max, $0) < (model.route($1)?.sortOrder ?? .max, $1) }
+    let stop = model.schedule?.stops[stopID]
     List {
       Section {
+        if let side = Compass.bound(stop?.facing) {
+          Label("\(side) · Stop \(stop?.code ?? "")", systemImage: Compass.symbol(stop?.facing)).font(.subheadline.weight(.semibold))
+        }
         Picker("Day", selection: $dayOffset) {
           ForEach(0..<7, id: \.self) { Text(dayTitle($0)).tag($0) }
         }
@@ -44,6 +48,7 @@ struct TimetableView: View {
           HStack(spacing: 8) {
             RouteBadge(routeID: group.routeID, compact: true)
             Text(group.headsign.prettyHeadsign).textCase(nil).font(.subheadline.weight(.semibold))
+            if let way = model.tripDirection(group.departures[0].tripID) { Text(way).textCase(nil).font(.caption).foregroundStyle(.secondary) }
           }
         }
       }

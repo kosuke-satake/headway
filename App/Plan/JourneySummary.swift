@@ -5,6 +5,8 @@ import HeadwayCore
 struct JourneySummary {
   let text: TimeText
   let routeName: (String) -> String
+  /// A stop's name, with the side of the street when the app knows it.
+  var stopName: (PlanPoint) -> String = { $0.name }
 
   func lines(for journey: Journey, from: String, to: String) -> [String] {
     var lines = [
@@ -24,8 +26,8 @@ struct JourneySummary {
       case .ride(let ride):
         lines.append(
           "• " + String(localized: "Route \(routeName(ride.routeID)) to \(ride.headsign.prettyHeadsign)") + ": "
-            + String(localized: "Board at \(ride.fromStop.name) · \(text.clock(ride.depart))") + ", "
-            + String(localized: "Get off at \(ride.toStop.name) · \(text.clock(ride.arrive))"))
+            + String(localized: "Board at \(stopName(ride.fromStop)) · \(text.clock(ride.depart))") + ", "
+            + String(localized: "Get off at \(stopName(ride.toStop)) · \(text.clock(ride.arrive))"))
       }
     }
     return lines

@@ -33,8 +33,11 @@ the data the city publishes (see Data below), and bus times can differ from what
 - **Directions.** Many Madison streets are one-way, so the two directions of a route often differ. Routes are listed by
   direction ("Westbound to ..."), the favourite-stop cards say where their buses go, and arrows along a route show which
   way its buses run.
-- **Overlapping routes.** Routes that share a street are drawn side by side in lanes, like a transit diagram; tapping
-  lines of several routes asks which one you meant. Each route and direction says how many buses are running, or why
+- **Overlapping routes.** Routes that share a street are drawn side by side in lanes on one shared centre line, like a
+  transit diagram, with one line per route where both directions use the same street; tapping lines of several routes
+  asks which one you meant.
+- **Which side of the street.** Stops of the same name on either side of a street are told apart: the stop sheet, search,
+  planner steps and timetable say "Southbound" and so on, and an arrow beside each stop on the map shows the way. Each route and direction says how many buses are running, or why
   there are none (not running today, between trips), with the next trip.
 - **Focus.** Tap a route, or one direction of it, to see only that on the map (other routes are hidden or faded, as you
   choose in Settings); an alert's **Show on map** link does the same and rings the stops its text names; the delay rows
